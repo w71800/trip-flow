@@ -50,3 +50,7 @@ npm run dev
 
 畫面右上角有「重新渲染（抓最新 Notion）」按鈕；Notion 有改動後，按一下或重新整理即可反映。
 
+## 快取策略
+
+專案已實作三層快取（本機 localStorage、伺服器 ETag/304、伺服器記憶體快取），用於在旅行期間減少 Notion API 與網路流量。詳見 [docs/caching-strategy.md](./docs/caching-strategy.md)。
+

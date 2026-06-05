@@ -44,6 +44,13 @@ body {
   font-size: 14px;
 }
 
+.cacheHint {
+  margin: 0;
+  width: 100%;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .datePicker {
   display: flex;
   flex-wrap: wrap;

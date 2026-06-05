@@ -1,5 +1,15 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
+import {
+  buildFingerprint,
+  canReuseFingerprint,
+  fingerprintToEtag,
+  getCurrentItineraryEtag,
+  getItineraryCache,
+  setItineraryCache,
+  touchItineraryFingerprintCheck,
+  type ItineraryCachePayload,
+} from "./itineraryCache.js";
 import { getNotionClient } from "./notion.js";
 import { blocksToHtml } from "./notionBlocksToHtml.js";
 import { propertiesToHtml } from "./notionPropertiesToHtml.js";
@@ -17,6 +27,8 @@ const EnvSchema = z.object({
   NOTION_BLOCKS_MAX_RENDER: z.string().optional(),
   NOTION_BLOCKS_MAX_FETCH: z.string().optional(),
   NOTION_MAX_CARDS: z.string().optional(),
+  ITINERARY_CACHE_MAX_AGE: z.string().optional(),
+  ITINERARY_FINGERPRINT_TTL: z.string().optional(),
 });
 
 function getEnv() {
@@ -228,123 +240,272 @@ function buildOrder(nodesById: Map<string, any>) {
   return orderedIds;
 }
 
+type ItineraryContext = {
+  env: ReturnType<typeof getEnv>;
+  notion: ReturnType<typeof getNotionClient>;
+  dataSourceId: string;
+  dataSource: any;
+  titlePropertyName: string;
+  nextPropertyName: string;
+  prevPropertyName: string;
+  detailsPropertyName: string | null;
+  datePropertyName: string | null;
+  pages: any[];
+  linkedNodes: Map<string, any>;
+  pageById: Map<string, any>;
+};
+
+function parseIfNoneMatch(header: string | undefined): string | null {
+  if (!header) return null;
+  const first = header.split(",")[0]?.trim();
+  return first || null;
+}
+
+function setItineraryResponseHeaders(res: Response, etag: string, maxAge: number) {
+  res.setHeader("ETag", etag);
+  res.setHeader("Cache-Control", `private, max-age=${maxAge}`);
+}
+
+async function collectContentTimestamps(
+  notion: any,
+  linkedNodes: Map<string, any>,
+  pageById: Map<string, any>,
+): Promise<Array<{ id: string; last_edited_time: string }>> {
+  const timestamps: Array<{ id: string; last_edited_time: string }> = [];
+  const seen = new Set<string>();
+
+  for (const node of linkedNodes.values()) {
+    const flowPage = pageById.get(node.id);
+    if (flowPage?.last_edited_time) {
+      timestamps.push({
+        id: node.id,
+        last_edited_time: flowPage.last_edited_time,
+      });
+    }
+
+    const contentPageId = node.detailsId ?? node.id;
+    if (seen.has(contentPageId)) continue;
+    seen.add(contentPageId);
+    if (contentPageId === node.id) continue;
+
+    try {
+      const contentPage = await notion.pages.retrieve({ page_id: contentPageId });
+      if (contentPage?.last_edited_time) {
+        timestamps.push({
+          id: contentPageId,
+          last_edited_time: contentPage.last_edited_time,
+        });
+      }
+    } catch {
+      // 內容頁讀不到時略過，仍會在完整重建時再嘗試。
+    }
+  }
+
+  return timestamps;
+}
+
+async function prepareItineraryContext(env: ReturnType<typeof getEnv>): Promise<ItineraryContext> {
+  const notion = getNotionClient();
+  const { dataSourceId, dataSource } = await resolveDataSource(
+    notion,
+    env.NOTION_FLOW_DATABASE_ID,
+  );
+
+  const titlePropertyName = pickTitlePropertyName(dataSource, env.NOTION_FLOW_TITLE_PROPERTY);
+  const nextPropertyName = pickRelationPropertyName(
+    dataSource,
+    env.NOTION_FLOW_NEXT_PROPERTY,
+    "next",
+  );
+  const prevPropertyName = pickRelationPropertyName(
+    dataSource,
+    env.NOTION_FLOW_PREVIOUS_PROPERTY,
+    "previous",
+  );
+  const detailsPropertyName = pickRelationPropertyName(
+    dataSource,
+    env.NOTION_FLOW_DETAILS_PROPERTY,
+    "details",
+  );
+  const datePropertyName = pickDatePropertyName(dataSource, env.NOTION_FLOW_DATE_PROPERTY);
+
+  if (!nextPropertyName || !prevPropertyName) {
+    throw new Error(
+      "找不到 next/previous 關聯欄位；請設定 NOTION_FLOW_NEXT_PROPERTY 與 NOTION_FLOW_PREVIOUS_PROPERTY。",
+    );
+  }
+
+  const pages = await queryDataSourceAllPages(notion, dataSourceId);
+  const nodesById = new Map<string, any>();
+  const pageById = new Map<string, any>();
+
+  for (const page of pages) {
+    const id: string = page.id;
+    pageById.set(id, page);
+
+    const nextIds = getRelationIds(page.properties?.[nextPropertyName]);
+    const prevIds = getRelationIds(page.properties?.[prevPropertyName]);
+    const detailsIds = detailsPropertyName
+      ? getRelationIds(page.properties?.[detailsPropertyName])
+      : [];
+
+    nodesById.set(id, {
+      id,
+      title: getTitleFromPage(page, titlePropertyName),
+      nextId: nextIds[0] ?? null,
+      prevId: prevIds[0] ?? null,
+      detailsId: detailsIds[0] ?? null,
+    });
+  }
+
+  const linkedNodes = new Map<string, any>();
+  for (const [id, node] of nodesById) {
+    if (node.nextId || node.prevId) linkedNodes.set(id, node);
+  }
+
+  return {
+    env,
+    notion,
+    dataSourceId,
+    dataSource,
+    titlePropertyName,
+    nextPropertyName,
+    prevPropertyName,
+    detailsPropertyName,
+    datePropertyName,
+    pages,
+    linkedNodes,
+    pageById,
+  };
+}
+
+async function buildItineraryPayload(ctx: ItineraryContext): Promise<ItineraryCachePayload> {
+  const orderedIds = buildOrder(ctx.linkedNodes);
+  const maxCards = Number(ctx.env.NOTION_MAX_CARDS ?? "50");
+  const maxRenderBlocks = Number(ctx.env.NOTION_BLOCKS_MAX_RENDER ?? "12");
+  const maxFetchBlocks = Number(ctx.env.NOTION_BLOCKS_MAX_FETCH ?? "60");
+
+  const items: any[] = [];
+  let order = 1;
+
+  for (const id of orderedIds) {
+    if (items.length >= maxCards) break;
+    const node = ctx.linkedNodes.get(id);
+    if (!node) continue;
+
+    const page = ctx.pageById.get(id);
+    const contentPageId = node.detailsId ?? node.id;
+    const blocks = await getPageBlocks(ctx.notion, contentPageId, maxFetchBlocks);
+    const { html: blockHtml } = await blocksToHtml(blocks, { maxBlocks: maxRenderBlocks });
+    const blockHtmlTrim = blockHtml.trim();
+
+    const skipProps = [
+      ctx.titlePropertyName,
+      ctx.nextPropertyName,
+      ctx.prevPropertyName,
+    ];
+    if (ctx.detailsPropertyName) skipProps.push(ctx.detailsPropertyName);
+    if (ctx.datePropertyName) skipProps.push(ctx.datePropertyName);
+    const propHtml = page ? propertiesToHtml(page.properties, { skip: skipProps }) : "";
+
+    const html = blockHtmlTrim || propHtml.trim() || "";
+
+    items.push({
+      flowId: node.id,
+      order,
+      title: node.title || `行程 ${order}`,
+      html,
+      date: page ? getDateFromPage(page, ctx.datePropertyName) : null,
+      nextFlowId: node.nextId,
+      prevFlowId: node.prevId,
+    });
+    order++;
+  }
+
+  const tripStart = ctx.env.TRIP_START_DATE ?? "2026-07-16";
+  const tripEnd = ctx.env.TRIP_END_DATE ?? "2026-07-23";
+
+  return {
+    ok: true,
+    items,
+    meta: {
+      fetchedAt: new Date().toISOString(),
+      tripStart,
+      tripEnd,
+      cached: false,
+    },
+  };
+}
+
 export async function handleItinerary(req: Request, res: Response) {
   try {
     const env = getEnv();
-    const notion = getNotionClient();
+    const forceRefresh = req.query.refresh === "1";
+    const maxAge = Number(env.ITINERARY_CACHE_MAX_AGE ?? "86400");
+    const fingerprintTtlMs = Number(env.ITINERARY_FINGERPRINT_TTL ?? "3600") * 1000;
+    const ifNoneMatch = parseIfNoneMatch(req.header("if-none-match"));
 
-    const { dataSourceId, dataSource } = await resolveDataSource(
-      notion,
-      env.NOTION_FLOW_DATABASE_ID,
-    );
+    if (!forceRefresh && canReuseFingerprint(fingerprintTtlMs)) {
+      const etag = getCurrentItineraryEtag();
+      const cachedPayload = etag ? getItineraryCache(etag) : null;
+      if (etag && cachedPayload) {
+        setItineraryResponseHeaders(res, etag, maxAge);
+        if (ifNoneMatch === etag) {
+          res.status(304).end();
+          return;
+        }
 
-    const titlePropertyName = pickTitlePropertyName(dataSource, env.NOTION_FLOW_TITLE_PROPERTY);
-    const nextPropertyName = pickRelationPropertyName(
-      dataSource,
-      env.NOTION_FLOW_NEXT_PROPERTY,
-      "next",
-    );
-    const prevPropertyName = pickRelationPropertyName(
-      dataSource,
-      env.NOTION_FLOW_PREVIOUS_PROPERTY,
-      "previous",
-    );
-    const detailsPropertyName = pickRelationPropertyName(
-      dataSource,
-      env.NOTION_FLOW_DETAILS_PROPERTY,
-      "details",
-    );
-    const datePropertyName = pickDatePropertyName(dataSource, env.NOTION_FLOW_DATE_PROPERTY);
-
-    if (!nextPropertyName || !prevPropertyName) {
-      throw new Error(
-        "找不到 next/previous 關聯欄位；請設定 NOTION_FLOW_NEXT_PROPERTY 與 NOTION_FLOW_PREVIOUS_PROPERTY。",
-      );
+        res.json({
+          ...cachedPayload,
+          meta: {
+            ...cachedPayload.meta,
+            cached: true,
+          },
+        });
+        return;
+      }
     }
 
-    const pages = await queryDataSourceAllPages(notion, dataSourceId);
+    const ctx = await prepareItineraryContext(env);
 
-    const nodesById = new Map<string, any>();
-    const pageById = new Map<string, any>();
+    const timestamps = await collectContentTimestamps(
+      ctx.notion,
+      ctx.linkedNodes,
+      ctx.pageById,
+    );
+    const etag = fingerprintToEtag(buildFingerprint(timestamps));
+    touchItineraryFingerprintCheck();
 
-    for (const page of pages) {
-      const id: string = page.id;
-      pageById.set(id, page);
+    if (!forceRefresh) {
+      const cachedPayload = getItineraryCache(etag);
+      if (cachedPayload) {
+        setItineraryResponseHeaders(res, etag, maxAge);
+        if (ifNoneMatch === etag) {
+          res.status(304).end();
+          return;
+        }
 
-      const nextIds = getRelationIds(page.properties?.[nextPropertyName]);
-      const prevIds = getRelationIds(page.properties?.[prevPropertyName]);
-      const detailsIds = detailsPropertyName
-        ? getRelationIds(page.properties?.[detailsPropertyName])
-        : [];
-
-      nodesById.set(id, {
-        id,
-        title: getTitleFromPage(page, titlePropertyName),
-        nextId: nextIds[0] ?? null,
-        prevId: prevIds[0] ?? null,
-        detailsId: detailsIds[0] ?? null,
-      });
+        res.json({
+          ...cachedPayload,
+          meta: {
+            ...cachedPayload.meta,
+            cached: true,
+          },
+        });
+        return;
+      }
     }
 
-    // 只保留有 Next 或 Previous 連結的行程
-    const linkedNodes = new Map<string, any>();
-    for (const [id, node] of nodesById) {
-      if (node.nextId || node.prevId) linkedNodes.set(id, node);
+    const payload = await buildItineraryPayload(ctx);
+    setItineraryCache(etag, payload);
+    setItineraryResponseHeaders(res, etag, maxAge);
+
+    if (!forceRefresh && ifNoneMatch === etag) {
+      res.status(304).end();
+      return;
     }
 
-    const orderedIds = buildOrder(linkedNodes);
-    const maxCards = Number(env.NOTION_MAX_CARDS ?? "50");
-    const maxRenderBlocks = Number(env.NOTION_BLOCKS_MAX_RENDER ?? "12");
-    const maxFetchBlocks = Number(env.NOTION_BLOCKS_MAX_FETCH ?? "60");
-
-    const items: any[] = [];
-    let order = 1;
-
-    for (const id of orderedIds) {
-      if (items.length >= maxCards) break;
-      const node = linkedNodes.get(id);
-      if (!node) continue;
-
-      const page = pageById.get(id);
-      const contentPageId = node.detailsId ?? node.id;
-      const blocks = await getPageBlocks(notion, contentPageId, maxFetchBlocks);
-      const { html: blockHtml } = await blocksToHtml(blocks, { maxBlocks: maxRenderBlocks });
-      const blockHtmlTrim = blockHtml.trim();
-
-      const skipProps = [titlePropertyName, nextPropertyName, prevPropertyName];
-      if (detailsPropertyName) skipProps.push(detailsPropertyName);
-      // 日期只用在前端分組；不需要把日期寫進卡片內容 HTML。
-      if (datePropertyName) skipProps.push(datePropertyName);
-      const propHtml = page ? propertiesToHtml(page.properties, { skip: skipProps }) : "";
-
-      // 即使內容是空的，也保留卡片，只顯示 title。
-      const html = blockHtmlTrim || propHtml.trim() || "";
-
-      items.push({
-        flowId: node.id,
-        order,
-        title: node.title || `行程 ${order}`,
-        html,
-        date: page ? getDateFromPage(page, datePropertyName) : null,
-        nextFlowId: node.nextId,
-        prevFlowId: node.prevId,
-      });
-      order++;
-    }
-
-    const tripStart = env.TRIP_START_DATE ?? "2026-07-16";
-    const tripEnd = env.TRIP_END_DATE ?? "2026-07-23";
-
-    res.setHeader("Cache-Control", "no-store");
-    res.json({
-      ok: true,
-      items,
-      meta: {
-        fetchedAt: new Date().toISOString(),
-        tripStart,
-        tripEnd,
-      },
-    });
+    res.json(payload);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     res.setHeader("Cache-Control", "no-store");

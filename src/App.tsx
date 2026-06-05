@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { loadItineraryCache, saveItineraryCache } from "./lib/itineraryCache";
 import { formatTripDate, generateDateRange } from "./lib/tripDates";
 
 type ItineraryItem = {
@@ -11,11 +12,18 @@ type ItineraryItem = {
   prevFlowId: string | null;
 };
 
+type ItineraryMeta = {
+  fetchedAt?: string;
+  tripStart?: string;
+  tripEnd?: string;
+  cached?: boolean;
+};
+
 type ApiResponse =
   | {
       ok: true;
       items: ItineraryItem[];
-      meta?: { fetchedAt?: string; tripStart?: string; tripEnd?: string };
+      meta?: ItineraryMeta;
     }
   | { ok: false; error: string };
 
@@ -58,8 +66,16 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string>(DEFAULT_TRIP_START);
+  const [cacheHint, setCacheHint] = useState<string | null>(null);
 
-  const apiUrl = useMemo(() => `/api/itinerary?nonce=${refreshNonce}`, [refreshNonce]);
+  const forceRefresh = refreshNonce > 0;
+  const apiUrl = useMemo(
+    () =>
+      forceRefresh
+        ? `/api/itinerary?refresh=1&_=${refreshNonce}`
+        : `/api/itinerary`,
+    [refreshNonce, forceRefresh],
+  );
 
   const tripDates = useMemo(
     () => generateDateRange(tripStart, tripEnd),
@@ -82,53 +98,102 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
+
+    function applyItinerary(nextItems: ItineraryItem[], meta?: ItineraryMeta) {
+      const start = meta?.tripStart ?? DEFAULT_TRIP_START;
+      const end = meta?.tripEnd ?? DEFAULT_TRIP_END;
+      const dates = generateDateRange(start, end);
+      const { counts: nextCounts, undated: nextUndated } = countItemsByDate(
+        nextItems,
+        dates,
+      );
+
+      setTripStart(start);
+      setTripEnd(end);
+      setItems(nextItems);
+      setSelectedDate((prev) => {
+        if (prev === UNDATED_KEY && nextUndated > 0) return UNDATED_KEY;
+        if (dates.includes(prev) && (nextCounts.get(prev) ?? 0) > 0) return prev;
+        return pickDefaultDate(dates, nextCounts, nextUndated);
+      });
+    }
+
     async function run() {
-      setLoading(true);
+      const localCache = forceRefresh ? null : loadItineraryCache();
+      const hasLocalCache = !!localCache;
+
+      if (hasLocalCache) {
+        applyItinerary(localCache.items, localCache.meta);
+        setCacheHint("已使用本機快取，正在確認是否有更新…");
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+
       setError(null);
+
       try {
+        const headers: Record<string, string> = {};
+        if (localCache?.etag && !forceRefresh) {
+          headers["If-None-Match"] = localCache.etag;
+        }
+
         const res = await fetch(apiUrl, {
-          headers: { "Cache-Control": "no-store" },
+          headers,
           signal: controller.signal,
         });
-        const json = (await res.json()) as ApiResponse;
+
         if (cancelled) return;
-        if (!json.ok) {
-          setError(json.error);
-          setItems([]);
+
+        if (res.status === 304) {
+          setCacheHint("內容未變更，沿用快取");
           return;
         }
 
-        const start = json.meta?.tripStart ?? DEFAULT_TRIP_START;
-        const end = json.meta?.tripEnd ?? DEFAULT_TRIP_END;
-        const dates = generateDateRange(start, end);
-        const { counts: nextCounts, undated: nextUndated } = countItemsByDate(
-          json.items,
-          dates,
-        );
+        const json = (await res.json()) as ApiResponse;
+        if (!json.ok) {
+          if (!hasLocalCache) {
+            setError(json.error);
+            setItems([]);
+          }
+          return;
+        }
 
-        setTripStart(start);
-        setTripEnd(end);
-        setItems(json.items);
-        setSelectedDate((prev) => {
-          if (prev === UNDATED_KEY && nextUndated > 0) return UNDATED_KEY;
-          if (dates.includes(prev) && (nextCounts.get(prev) ?? 0) > 0) return prev;
-          return pickDefaultDate(dates, nextCounts, nextUndated);
-        });
+        applyItinerary(json.items, json.meta);
+
+        const etag = res.headers.get("ETag");
+        if (etag) {
+          saveItineraryCache({
+            etag,
+            items: json.items,
+            meta: json.meta ?? {},
+            savedAt: new Date().toISOString(),
+          });
+        }
+
+        setCacheHint(
+          json.meta?.cached
+            ? "內容未變更，沿用伺服器快取"
+            : "已更新為最新行程",
+        );
       } catch (e) {
         if (cancelled) return;
         if (e instanceof DOMException && e.name === "AbortError") return;
-        setError(e instanceof Error ? e.message : String(e));
-        setItems([]);
+        if (!hasLocalCache) {
+          setError(e instanceof Error ? e.message : String(e));
+          setItems([]);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
+
     run();
     return () => {
       cancelled = true;
       controller.abort();
     };
-  }, [apiUrl]);
+  }, [apiUrl, forceRefresh]);
 
   return (
     <div className="page">
@@ -137,6 +202,7 @@ export default function App() {
         <p className="subtitle">
           依日期瀏覽行程，卡片間以時間軸呈現 next / previous 順序。
         </p>
+        {cacheHint && <p className="cacheHint">{cacheHint}</p>}
       </div>
 
       {loading && <div className="status">載入中...</div>}
