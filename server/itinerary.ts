@@ -11,6 +11,9 @@ const EnvSchema = z.object({
   NOTION_FLOW_PREVIOUS_PROPERTY: z.string().optional(),
   NOTION_FLOW_DETAILS_PROPERTY: z.string().optional(),
   NOTION_FLOW_TITLE_PROPERTY: z.string().optional(),
+  NOTION_FLOW_DATE_PROPERTY: z.string().optional(),
+  TRIP_START_DATE: z.string().optional(),
+  TRIP_END_DATE: z.string().optional(),
   NOTION_BLOCKS_MAX_RENDER: z.string().optional(),
   NOTION_BLOCKS_MAX_FETCH: z.string().optional(),
   NOTION_MAX_CARDS: z.string().optional(),
@@ -55,6 +58,29 @@ function pickTitlePropertyName(schema: any, override?: string) {
   throw new Error(
     "找不到 title 欄位；請在 .env 設定 NOTION_FLOW_TITLE_PROPERTY（你的 database 可能是「名稱」）。",
   );
+}
+
+function pickDatePropertyName(schema: any, override?: string) {
+  if (override) return override;
+
+  const dateCandidates: string[] = [];
+  for (const [name, prop] of Object.entries<any>(schema?.properties ?? {})) {
+    if (prop?.type === "date") dateCandidates.push(name);
+  }
+
+  const datePatterns = [/日期/i, /date/i, /時間/i, /time/i, /day/i];
+  for (const name of dateCandidates) {
+    if (datePatterns.some((re) => re.test(name))) return name;
+  }
+
+  return dateCandidates[0] ?? null;
+}
+
+function getDateFromPage(page: any, datePropertyName: string | null): string | null {
+  if (!datePropertyName) return null;
+  const prop = page?.properties?.[datePropertyName];
+  if (!prop || prop.type !== "date" || !prop.date?.start) return null;
+  return String(prop.date.start).slice(0, 10);
 }
 
 function pickRelationPropertyName(
@@ -228,6 +254,7 @@ export async function handleItinerary(req: Request, res: Response) {
       env.NOTION_FLOW_DETAILS_PROPERTY,
       "details",
     );
+    const datePropertyName = pickDatePropertyName(dataSource, env.NOTION_FLOW_DATE_PROPERTY);
 
     if (!nextPropertyName || !prevPropertyName) {
       throw new Error(
@@ -282,28 +309,41 @@ export async function handleItinerary(req: Request, res: Response) {
       const contentPageId = node.detailsId ?? node.id;
       const blocks = await getPageBlocks(notion, contentPageId, maxFetchBlocks);
       const { html: blockHtml } = await blocksToHtml(blocks, { maxBlocks: maxRenderBlocks });
+      const blockHtmlTrim = blockHtml.trim();
 
       const skipProps = [titlePropertyName, nextPropertyName, prevPropertyName];
       if (detailsPropertyName) skipProps.push(detailsPropertyName);
+      // 日期只用在前端分組；不需要把日期寫進卡片內容 HTML。
+      if (datePropertyName) skipProps.push(datePropertyName);
       const propHtml = page ? propertiesToHtml(page.properties, { skip: skipProps }) : "";
 
-      const html = blockHtml.trim() || propHtml.trim();
-      if (!html) continue;
+      // 即使內容是空的，也保留卡片，只顯示 title。
+      const html = blockHtmlTrim || propHtml.trim() || "";
 
       items.push({
         flowId: node.id,
         order,
         title: node.title || `行程 ${order}`,
         html,
+        date: page ? getDateFromPage(page, datePropertyName) : null,
+        nextFlowId: node.nextId,
+        prevFlowId: node.prevId,
       });
       order++;
     }
+
+    const tripStart = env.TRIP_START_DATE ?? "2026-07-16";
+    const tripEnd = env.TRIP_END_DATE ?? "2026-07-23";
 
     res.setHeader("Cache-Control", "no-store");
     res.json({
       ok: true,
       items,
-      meta: { fetchedAt: new Date().toISOString() },
+      meta: {
+        fetchedAt: new Date().toISOString(),
+        tripStart,
+        tripEnd,
+      },
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
