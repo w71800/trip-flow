@@ -1,3 +1,5 @@
+import "./TripCard.css";
+
 type TripCardProps = {
   order: number;
   title: string;
@@ -6,7 +8,7 @@ type TripCardProps = {
   isLinkedToNext: boolean;
 };
 
-export function TripCard({ 
+export function TripCard({
   order,
   title,
   html,
@@ -24,15 +26,13 @@ export function TripCard({
         )}
       </div>
       <article className="card timelineCard">
-        <h2>
-          {title}
-        </h2>
+        <h2>{title}</h2>
         {html.trim() && (
-        <div
-          className="content"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      )}
+          <div
+            className="content"
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        )}
       </article>
     </li>
   );
