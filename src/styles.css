@@ -161,6 +161,10 @@ body {
   line-height: 1.3;
 }
 
+.card h2:last-child {
+  margin-bottom: 0;
+}
+
 .content {
   color: #111827;
   font-size: 13.5px;

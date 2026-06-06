@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { TripCard } from "./components/TripCard";
 import { loadItineraryCache, saveItineraryCache } from "./lib/itineraryCache";
 import { formatTripDate, generateDateRange } from "./lib/tripDates";
 
@@ -257,25 +258,14 @@ export default function App() {
                     nextItem.prevFlowId === it.flowId);
 
                 return (
-                  <li key={it.flowId} className="timelineItem">
-                    <div className="timelineRail" aria-hidden="true">
-                      <span className="timelineNode" />
-                      {index < dayItems.length - 1 && (
-                        <span
-                          className={`timelineConnector${isLinkedToNext ? " isLinked" : ""}`}
-                        />
-                      )}
-                    </div>
-                    <article className="card timelineCard">
-                      <h2>
-                        {it.order}. {it.title}
-                      </h2>
-                      <div
-                        className="content"
-                        dangerouslySetInnerHTML={{ __html: it.html }}
-                      />
-                    </article>
-                  </li>
+                  <TripCard
+                    key={it.flowId}
+                    order={it.order}
+                    title={it.title}
+                    html={it.html}
+                    isLast={index === dayItems.length - 1}
+                    isLinkedToNext={isLinkedToNext}
+                  />
                 );
               })}
             </ol>
