@@ -246,3 +246,9 @@ button:hover {
   background: rgba(17, 24, 39, 0.02);
 }
 
+.btnRow {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+}
+

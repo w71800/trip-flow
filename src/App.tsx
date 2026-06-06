@@ -197,11 +197,13 @@ export default function App() {
 
   return (
     <div className="page">
+      <div className="btnRow">
+        <button type="button" onClick={() => setRefreshNonce((n) => n + 1)}>
+          重新整理
+        </button>
+      </div>
       <div className="header">
         <h1 className="title">Trip Flow</h1>
-        <p className="subtitle">
-          依日期瀏覽行程，卡片間以時間軸呈現 next / previous 順序。
-        </p>
         {cacheHint && <p className="cacheHint">{cacheHint}</p>}
       </div>
 
@@ -280,12 +282,6 @@ export default function App() {
           )}
         </>
       )}
-
-      <div className="btnRow">
-        <button type="button" onClick={() => setRefreshNonce((n) => n + 1)}>
-          重新渲染（抓最新 Notion）
-        </button>
-      </div>
     </div>
   );
 }
