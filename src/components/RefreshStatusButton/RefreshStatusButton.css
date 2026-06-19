@@ -1,0 +1,35 @@
+.refreshStatusButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  text-align: left;
+}
+
+.refreshStatusButton.isBusy {
+  cursor: wait;
+  color: var(--muted);
+}
+
+.refreshStatusIcon {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.refreshStatusButton:not(.isBusy):hover .refreshStatusIcon {
+  opacity: 1;
+}
+
+.refreshStatusIcon.isSpinning {
+  animation: refreshSpin 0.8s linear infinite;
+}
+
+.refreshStatusLabel {
+  line-height: 1.35;
+}
+
+@keyframes refreshSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}

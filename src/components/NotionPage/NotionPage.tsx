@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { RefreshStatusButton } from "../RefreshStatusButton";
+import { CacheStatus } from "../../lib/cacheStatus";
 import "./NotionPage.css";
 
 type PageMeta = {
@@ -20,7 +22,6 @@ type PageResponse =
 
 type NotionPageViewProps = {
   pageKey: "flight" | "accommodation";
-  refreshLabel?: string;
 };
 
 function isEmojiIcon(icon: string | null): boolean {
@@ -28,13 +29,13 @@ function isEmojiIcon(icon: string | null): boolean {
   return !/^https?:\/\//i.test(icon);
 }
 
-export function NotionPageView({ pageKey, refreshLabel = "重新整理" }: NotionPageViewProps) {
+export function NotionPageView({ pageKey }: NotionPageViewProps) {
   const [title, setTitle] = useState("");
   const [icon, setIcon] = useState<string | null>(null);
   const [html, setHtml] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [cacheHint, setCacheHint] = useState<string | null>(null);
+  const [cacheStatus, setCacheStatus] = useState<CacheStatus>(CacheStatus.Loading);
   const [refreshNonce, setRefreshNonce] = useState(0);
 
   const apiUrl = useMemo(
@@ -52,13 +53,14 @@ export function NotionPageView({ pageKey, refreshLabel = "重新整理" }: Notio
     async function run() {
       setLoading(true);
       setError(null);
+      setCacheStatus(CacheStatus.Loading);
 
       try {
         const res = await fetch(apiUrl, { signal: controller.signal });
         if (cancelled) return;
 
         if (res.status === 304) {
-          setCacheHint("內容未變更");
+          setCacheStatus(CacheStatus.Unchanged);
           setLoading(false);
           return;
         }
@@ -73,8 +75,8 @@ export function NotionPageView({ pageKey, refreshLabel = "重新整理" }: Notio
         setTitle(json.title);
         setIcon(json.icon);
         setHtml(json.html);
-        setCacheHint(
-          json.meta?.cached ? "已使用快取" : "已更新為最新內容",
+        setCacheStatus(
+          json.meta?.cached ? CacheStatus.ServerCached : CacheStatus.Updated,
         );
       } catch (e) {
         if (cancelled) return;
@@ -93,13 +95,15 @@ export function NotionPageView({ pageKey, refreshLabel = "重新整理" }: Notio
     };
   }, [apiUrl]);
 
+  function handleRefresh() {
+    setCacheStatus(CacheStatus.Loading);
+    setRefreshNonce((n) => n + 1);
+  }
+
   return (
-    <div className="notionPageShell">
-      <div className="notionPageToolbar">
-        <button type="button" onClick={() => setRefreshNonce((n) => n + 1)}>
-          {refreshLabel}
-        </button>
-        {cacheHint && <span className="notionPageHint">{cacheHint}</span>}
+    <div className="page notionPageShell">
+      <div className="pageToolbar">
+        <RefreshStatusButton status={cacheStatus} onRefresh={handleRefresh} />
       </div>
 
       <article className="notionPage">

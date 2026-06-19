@@ -41,13 +41,25 @@
 }
 
 .navLink {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 12px;
   border-radius: 8px;
   font-size: 14px;
   color: var(--muted);
   text-decoration: none;
   transition: background 0.15s, color 0.15s;
+}
+
+.navIcon {
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+.navLink:hover .navIcon,
+.navLink.isActive .navIcon {
+  opacity: 1;
 }
 
 .navLink:hover {

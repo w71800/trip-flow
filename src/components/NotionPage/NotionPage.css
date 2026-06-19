@@ -1,34 +1,5 @@
-/* Notion-like dark page shell */
 .notionPageShell {
   min-height: calc(100vh - 52px);
-  background: #191919;
-  color: rgba(255, 255, 255, 0.9);
-  padding: 0 16px 64px;
-}
-
-.notionPageToolbar {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 12px 0 8px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  justify-content: flex-end;
-}
-
-.notionPageToolbar button {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.82);
-}
-
-.notionPageToolbar button:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.notionPageHint {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
 }
 
 .notionPage {
@@ -37,7 +8,8 @@
 }
 
 .notionPageHeader {
-  padding: 24px 0 8px;
+  padding: 8px 0;
+  margin-bottom: 8px;
 }
 
 .notionPageIcon {
@@ -45,34 +17,34 @@
 }
 
 .notionPageEmoji {
-  font-size: 78px;
+  font-size: 56px;
   line-height: 1;
   display: block;
 }
 
 .notionPageIcon img {
-  width: 78px;
-  height: 78px;
+  width: 56px;
+  height: 56px;
   object-fit: contain;
 }
 
 .notionPageTitle {
   margin: 0;
-  font-size: 40px;
+  font-size: 28px;
   font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-  color: rgba(255, 255, 255, 0.93);
+  line-height: 1.25;
+  letter-spacing: 0.2px;
+  color: var(--text);
 }
 
 .notionPageStatus {
   margin-top: 24px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--muted);
   font-size: 14px;
 }
 
 .notionPageError {
-  color: #ff7369;
+  color: #dc2626;
 }
 
 .notionPageContent {
@@ -85,7 +57,7 @@
 .notionPageContent .notion-paragraph {
   margin: 3px 0 6px;
   min-height: 1.6em;
-  color: rgba(255, 255, 255, 0.81);
+  color: var(--text);
 }
 
 .notionPageContent .notion-empty {
@@ -95,25 +67,25 @@
 .notionPageContent .notion-heading {
   margin: 24px 0 4px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.93);
+  color: var(--text);
 }
 
 .notionPageContent .notion-h1 {
-  font-size: 30px;
-  margin-top: 32px;
+  font-size: 26px;
+  margin-top: 28px;
 }
 
 .notionPageContent .notion-h2 {
-  font-size: 24px;
+  font-size: 22px;
 }
 
 .notionPageContent .notion-h3 {
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .notionPageContent .notion-divider {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  border-top: 1px solid var(--border);
   margin: 20px 0;
 }
 
@@ -122,20 +94,21 @@
   gap: 12px;
   align-items: flex-start;
   margin: 8px 0 12px;
-  padding: 16px 16px 16px 14px;
+  padding: 14px 16px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--card);
+  border: 1px solid var(--border);
 }
 
 .notionPageContent .notion-callout-icon {
   flex: 0 0 auto;
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1.35;
 }
 
 .notionPageContent .notion-callout-img {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   object-fit: contain;
 }
 
@@ -156,7 +129,7 @@
   cursor: pointer;
   list-style: none;
   padding: 4px 0;
-  color: rgba(255, 255, 255, 0.81);
+  color: var(--text);
   user-select: none;
 }
 
@@ -169,7 +142,7 @@
   display: inline-block;
   width: 1.2em;
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--muted);
   transition: transform 0.15s;
 }
 
@@ -197,15 +170,16 @@
 .notionPageContent .notion-quote {
   margin: 8px 0;
   padding: 4px 0 4px 14px;
-  border-left: 3px solid rgba(255, 255, 255, 0.25);
-  color: rgba(255, 255, 255, 0.72);
+  border-left: 3px solid var(--border);
+  color: var(--muted);
 }
 
 .notionPageContent .notion-code {
   margin: 8px 0;
   padding: 14px 16px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(17, 24, 39, 0.04);
+  border: 1px solid var(--border);
   overflow-x: auto;
   font-size: 14px;
 }
@@ -217,7 +191,7 @@
 .notionPageContent .notion-image img {
   max-width: 100%;
   height: auto;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .notionPageContent .notion-bookmark {
@@ -225,8 +199,9 @@
   margin: 8px 0;
   padding: 12px 14px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.85);
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
   text-decoration: none;
 }
 
@@ -238,70 +213,70 @@
 }
 
 .notionPageContent a {
-  color: rgba(255, 255, 255, 0.72);
+  color: #2563eb;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .notionPageContent a:hover {
-  color: rgba(255, 255, 255, 0.95);
+  color: #1d4ed8;
 }
 
 .notionPageContent code {
   padding: 0.15em 0.35em;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(17, 24, 39, 0.06);
   font-size: 0.9em;
 }
 
-/* Notion text colors (dark theme) */
+/* Notion text colors (light theme) */
 .notionPageContent .notion-text.notion-color-red {
-  color: #ff7369;
+  color: #dc2626;
 }
 
 .notionPageContent .notion-text.notion-color-orange {
-  color: #ffa057;
+  color: #ea580c;
 }
 
 .notionPageContent .notion-text.notion-color-yellow {
-  color: #ffdc49;
+  color: #ca8a04;
 }
 
 .notionPageContent .notion-text.notion-color-green {
-  color: #4dab9a;
+  color: #059669;
 }
 
 .notionPageContent .notion-text.notion-color-blue {
-  color: #529cca;
+  color: #2563eb;
 }
 
 .notionPageContent .notion-text.notion-color-purple {
-  color: #9a6dd7;
+  color: #7c3aed;
 }
 
 .notionPageContent .notion-text.notion-color-pink {
-  color: #e255a1;
+  color: #db2777;
 }
 
 .notionPageContent .notion-text.notion-color-gray,
 .notionPageContent .notion-text.notion-color-brown {
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--muted);
 }
 
 .notionPageContent .notion-text.notion-color-red-background {
-  background: rgba(255, 115, 105, 0.28);
+  background: rgba(220, 38, 38, 0.1);
   border-radius: 3px;
   padding: 0 2px;
 }
 
 .notionPageContent .notion-text.notion-color-gray-background {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(17, 24, 39, 0.06);
   border-radius: 3px;
   padding: 0 2px;
 }
 
 .notionPageContent .notion-text.notion-color-yellow-background {
-  background: rgba(255, 220, 73, 0.22);
+  background: rgba(202, 138, 4, 0.14);
   border-radius: 3px;
   padding: 0 2px;
 }

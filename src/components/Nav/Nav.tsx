@@ -1,11 +1,12 @@
 import { NavLink } from "react-router-dom";
+import { AccommodationIcon, FlightIcon, TimelineIcon } from "./NavIcons";
 import "./Nav.css";
 
 const navItems = [
-  { to: "/", label: "行程時間軸", end: true },
-  { to: "/flight", label: "飛機資訊", end: false },
-  { to: "/accommodation", label: "住宿資訊", end: false },
-];
+  { to: "/", label: "行程時間軸", end: true, Icon: TimelineIcon },
+  { to: "/flight", label: "飛機資訊", end: false, Icon: FlightIcon },
+  { to: "/accommodation", label: "住宿資訊", end: false, Icon: AccommodationIcon },
+] as const;
 
 export function Nav() {
   return (
@@ -24,7 +25,8 @@ export function Nav() {
                   `navLink${isActive ? " isActive" : ""}`
                 }
               >
-                {item.label}
+                <item.Icon className="navIcon" />
+                <span>{item.label}</span>
               </NavLink>
             </li>
           ))}

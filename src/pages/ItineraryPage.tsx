@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { RefreshStatusButton } from "../components/RefreshStatusButton";
 import { TripCard } from "../components/TripCard";
+import { CacheStatus } from "../lib/cacheStatus";
 import { loadItineraryCache, saveItineraryCache } from "../lib/itineraryCache";
 import { formatTripDate, generateDateRange } from "../lib/tripDates";
 
@@ -67,7 +69,7 @@ export function ItineraryPage() {
   const [error, setError] = useState<string | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string>(DEFAULT_TRIP_START);
-  const [cacheHint, setCacheHint] = useState<string | null>(null);
+  const [cacheStatus, setCacheStatus] = useState<CacheStatus>(CacheStatus.Loading);
 
   const forceRefresh = refreshNonce > 0;
   const apiUrl = useMemo(
@@ -125,9 +127,10 @@ export function ItineraryPage() {
 
       if (hasLocalCache) {
         applyItinerary(localCache.items, localCache.meta);
-        setCacheHint("已使用本機快取，正在確認是否有更新…");
+        setCacheStatus(CacheStatus.CheckingLocal);
         setLoading(false);
       } else {
+        setCacheStatus(CacheStatus.Loading);
         setLoading(true);
       }
 
@@ -147,7 +150,7 @@ export function ItineraryPage() {
         if (cancelled) return;
 
         if (res.status === 304) {
-          setCacheHint("內容未變更，沿用快取");
+          setCacheStatus(CacheStatus.Unchanged);
           return;
         }
 
@@ -172,10 +175,8 @@ export function ItineraryPage() {
           });
         }
 
-        setCacheHint(
-          json.meta?.cached
-            ? "內容未變更，沿用伺服器快取"
-            : "已更新為最新行程",
+        setCacheStatus(
+          json.meta?.cached ? CacheStatus.ServerCached : CacheStatus.Updated,
         );
       } catch (e) {
         if (cancelled) return;
@@ -196,16 +197,18 @@ export function ItineraryPage() {
     };
   }, [apiUrl, forceRefresh]);
 
+  function handleRefresh() {
+    setCacheStatus(CacheStatus.Loading);
+    setRefreshNonce((n) => n + 1);
+  }
+
   return (
     <div className="page">
       <div className="pageToolbar">
-        <button type="button" onClick={() => setRefreshNonce((n) => n + 1)}>
-          重新整理
-        </button>
+        <RefreshStatusButton status={cacheStatus} onRefresh={handleRefresh} />
       </div>
       <div className="header">
         <h1 className="title">行程時間軸</h1>
-        {cacheHint && <p className="cacheHint">{cacheHint}</p>}
       </div>
 
       {loading && <div className="status">載入中...</div>}
