@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { EmptyDayState } from "../components/EmptyDayState";
 import { RefreshStatusButton } from "../components/RefreshStatusButton";
 import { Select } from "../components/Select";
@@ -6,6 +6,7 @@ import { TripCard } from "../components/TripCard";
 import { CacheStatus } from "../lib/cacheStatus";
 import { loadItineraryCache, saveItineraryCache } from "../lib/itineraryCache";
 import { formatTripDate, generateDateRange } from "../lib/tripDates";
+import "./ItineraryPage.css";
 
 type ItineraryItem = {
   flowId: string;
@@ -35,6 +36,7 @@ type ApiResponse =
 const DEFAULT_TRIP_START = "2026-07-16";
 const DEFAULT_TRIP_END = "2026-07-23";
 const UNDATED_KEY = "__undated__";
+const DAY_CONTENT_FADE_MS = 220;
 
 function countItemsByDate(items: ItineraryItem[], dates: string[]) {
   const counts = new Map<string, number>();
@@ -63,6 +65,18 @@ function pickDefaultDate(
   return dates[0] ?? UNDATED_KEY;
 }
 
+function filterItemsByDate(items: ItineraryItem[], date: string) {
+  const filtered =
+    date === UNDATED_KEY
+      ? items.filter((it) => !it.date)
+      : items.filter((it) => it.date === date);
+  return [...filtered].sort((a, b) => a.order - b.order);
+}
+
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 export function ItineraryPage() {
   const [items, setItems] = useState<ItineraryItem[]>([]);
   const [tripStart, setTripStart] = useState(DEFAULT_TRIP_START);
@@ -71,7 +85,10 @@ export function ItineraryPage() {
   const [error, setError] = useState<string | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string>(DEFAULT_TRIP_START);
+  const [displayDate, setDisplayDate] = useState<string>(DEFAULT_TRIP_START);
+  const [contentVisible, setContentVisible] = useState(true);
   const [cacheStatus, setCacheStatus] = useState<CacheStatus>(CacheStatus.Loading);
+  const animateDateChangeRef = useRef(false);
 
   const forceRefresh = refreshNonce > 0;
   const apiUrl = useMemo(
@@ -92,13 +109,28 @@ export function ItineraryPage() {
     [items, tripDates],
   );
 
-  const dayItems = useMemo(() => {
-    const filtered =
-      selectedDate === UNDATED_KEY
-        ? items.filter((it) => !it.date)
-        : items.filter((it) => it.date === selectedDate);
-    return [...filtered].sort((a, b) => a.order - b.order);
-  }, [items, selectedDate]);
+  const displayedDayItems = useMemo(
+    () => filterItemsByDate(items, displayDate),
+    [items, displayDate],
+  );
+
+  useEffect(() => {
+    if (selectedDate === displayDate) return;
+
+    if (!animateDateChangeRef.current || prefersReducedMotion()) {
+      setDisplayDate(selectedDate);
+      setContentVisible(true);
+      return;
+    }
+
+    setContentVisible(false);
+    const timer = window.setTimeout(() => {
+      setDisplayDate(selectedDate);
+      requestAnimationFrame(() => setContentVisible(true));
+    }, DAY_CONTENT_FADE_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [selectedDate, displayDate]);
 
   const dateOptions = useMemo(() => {
     const options = tripDates.map((date) => {
@@ -223,6 +255,12 @@ export function ItineraryPage() {
     setRefreshNonce((n) => n + 1);
   }
 
+  function handleDateChange(nextDate: string) {
+    if (nextDate === selectedDate) return;
+    animateDateChangeRef.current = true;
+    setSelectedDate(nextDate);
+  }
+
   return (
     <div className="page">
       <div className="pageToolbar">
@@ -257,35 +295,40 @@ export function ItineraryPage() {
               id="trip-date"
               value={selectedDate}
               options={dateOptions}
-              onChange={setSelectedDate}
+              onChange={handleDateChange}
               aria-labelledby="trip-date-label"
             />
           </div>
 
-          {dayItems.length === 0 ? (
-            <EmptyDayState />
-          ) : (
-            <ol className="timeline" aria-label="行程時間軸">
-              {dayItems.map((it, index) => {
-                const nextItem = dayItems[index + 1];
-                const isLinkedToNext =
-                  !!nextItem &&
-                  (it.nextFlowId === nextItem.flowId ||
-                    nextItem.prevFlowId === it.flowId);
+          <div
+            className={`dayContent${contentVisible ? " isVisible" : ""}`}
+            aria-hidden={!contentVisible}
+          >
+            {displayedDayItems.length === 0 ? (
+              <EmptyDayState />
+            ) : (
+              <ol className="timeline" aria-label="行程時間軸">
+                {displayedDayItems.map((it, index) => {
+                  const nextItem = displayedDayItems[index + 1];
+                  const isLinkedToNext =
+                    !!nextItem &&
+                    (it.nextFlowId === nextItem.flowId ||
+                      nextItem.prevFlowId === it.flowId);
 
-                return (
-                  <TripCard
-                    key={it.flowId}
-                    order={it.order}
-                    title={it.title}
-                    html={it.html}
-                    isLast={index === dayItems.length - 1}
-                    isLinkedToNext={isLinkedToNext}
-                  />
-                );
-              })}
-            </ol>
-          )}
+                  return (
+                    <TripCard
+                      key={it.flowId}
+                      order={it.order}
+                      title={it.title}
+                      html={it.html}
+                      isLast={index === displayedDayItems.length - 1}
+                      isLinkedToNext={isLinkedToNext}
+                    />
+                  );
+                })}
+              </ol>
+            )}
+          </div>
         </>
       )}
     </div>

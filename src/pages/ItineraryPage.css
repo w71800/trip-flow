@@ -1,0 +1,14 @@
+.dayContent {
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+.dayContent.isVisible {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dayContent {
+    transition: none;
+  }
+}
