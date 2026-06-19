@@ -1,4 +1,4 @@
-import "./EmptyDayState.css";
+import { EmptyState } from "../EmptyState";
 
 type EmptyDayIconProps = {
   className?: string;
@@ -35,11 +35,9 @@ export function EmptyDayState({
   message = "這天還沒有行程安排。",
 }: EmptyDayStateProps) {
   return (
-    <div className="emptyDayState" role="status">
-      <div className="emptyDayStateIconWrap" aria-hidden="true">
-        <EmptyDayIcon className="emptyDayStateIcon" />
-      </div>
-      <p className="emptyDayStateText">{message}</p>
-    </div>
+    <EmptyState
+      message={message}
+      icon={<EmptyDayIcon className="emptyStateIcon" />}
+    />
   );
 }

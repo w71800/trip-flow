@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../auth/apiFetch";
 import { useAuth } from "../auth/AuthContext";
+import { EmptyState } from "../components/EmptyState";
+import { TicketIcon } from "../components/Nav/NavIcons";
 
 type TicketResponse =
   | { ok: true; message: string; user: { id: string; displayName: string } }
   | { ok: false; error: string };
+
+const ticketEmptyIcon = <TicketIcon className="emptyStateIcon" />;
 
 export function TicketPage() {
   const { session } = useAuth();
@@ -36,6 +40,8 @@ export function TicketPage() {
     };
   }, []);
 
+  const emptyMessage = error ?? message ?? "載入中…";
+
   return (
     <main className="page">
       <header className="header">
@@ -47,11 +53,7 @@ export function TicketPage() {
         </p>
       </header>
 
-      {error ? (
-        <p className="status">{error}</p>
-      ) : (
-        <p className="status">{message ?? "載入中…"}</p>
-      )}
+      <EmptyState message={emptyMessage} icon={ticketEmptyIcon} />
     </main>
   );
 }

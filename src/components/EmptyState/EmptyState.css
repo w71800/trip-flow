@@ -1,4 +1,4 @@
-.emptyDayState {
+.emptyState {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -13,7 +13,7 @@
   box-shadow: 0 1px 0 rgba(17, 24, 39, 0.04);
 }
 
-.emptyDayStateIconWrap {
+.emptyStateIconWrap {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -26,11 +26,13 @@
   color: var(--muted);
 }
 
-.emptyDayStateIcon {
+.emptyStateIcon {
   flex-shrink: 0;
+  width: 32px;
+  height: 32px;
 }
 
-.emptyDayStateText {
+.emptyStateText {
   margin: 0;
   max-width: 280px;
   color: var(--muted);
