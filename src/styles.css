@@ -103,11 +103,12 @@ body {
   font-size: 14px;
 }
 
-.btnRow {
+.pageToolbar {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  margin: 12px 0 20px;
+  justify-content: flex-end;
+  margin: 0 0 12px;
 }
 
 button {
@@ -123,11 +124,5 @@ button {
 
 button:hover {
   background: rgba(17, 24, 39, 0.02);
-}
-
-.btnRow {
-  position: fixed;
-  top: 12px;
-  right: 12px;
 }
 
