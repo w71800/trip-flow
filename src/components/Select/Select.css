@@ -1,0 +1,95 @@
+.select {
+  position: relative;
+  min-width: 220px;
+}
+
+.selectTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  appearance: none;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.selectTrigger:hover {
+  background: rgba(17, 24, 39, 0.02);
+}
+
+.selectTrigger:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 2px;
+}
+
+.selectTrigger[aria-expanded="true"] {
+  border-color: rgba(37, 99, 235, 0.35);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.15);
+}
+
+.selectValue {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectChevron {
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.selectTrigger[aria-expanded="true"] .selectChevron {
+  transform: rotate(180deg);
+}
+
+.selectList {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow:
+    0 4px 16px rgba(17, 24, 39, 0.08),
+    0 1px 0 rgba(17, 24, 39, 0.04);
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.selectOption {
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.selectOption:hover,
+.selectOption.isHighlighted {
+  background: rgba(17, 24, 39, 0.04);
+}
+
+.selectOption.isSelected {
+  color: #2563eb;
+  font-weight: 600;
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.selectOption.isSelected.isHighlighted {
+  background: rgba(37, 99, 235, 0.12);
+}

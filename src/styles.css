@@ -58,29 +58,6 @@ body {
   color: var(--text);
 }
 
-.dateSelect {
-  min-width: 220px;
-  appearance: none;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: var(--text);
-  padding: 10px 36px 10px 12px;
-  border-radius: 10px;
-  font-size: 14px;
-  cursor: pointer;
-  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
-    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-  background-position: calc(100% - 18px) calc(50% + 2px),
-    calc(100% - 12px) calc(50% + 2px);
-  background-size: 6px 6px, 6px 6px;
-  background-repeat: no-repeat;
-}
-
-.dateSelect:focus {
-  outline: 2px solid rgba(37, 99, 235, 0.35);
-  outline-offset: 2px;
-}
-
 .timeline {
   list-style: none;
   margin: 0;

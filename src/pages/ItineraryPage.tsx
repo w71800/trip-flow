@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { RefreshStatusButton } from "../components/RefreshStatusButton";
+import { Select } from "../components/Select";
 import { TripCard } from "../components/TripCard";
 import { CacheStatus } from "../lib/cacheStatus";
 import { loadItineraryCache, saveItineraryCache } from "../lib/itineraryCache";
@@ -97,6 +98,25 @@ export function ItineraryPage() {
         : items.filter((it) => it.date === selectedDate);
     return [...filtered].sort((a, b) => a.order - b.order);
   }, [items, selectedDate]);
+
+  const dateOptions = useMemo(() => {
+    const options = tripDates.map((date) => {
+      const count = counts.get(date) ?? 0;
+      return {
+        value: date,
+        label: `${formatTripDate(date)}${count > 0 ? ` · ${count} 個行程` : ""}`,
+      };
+    });
+
+    if (undated > 0) {
+      options.push({
+        value: UNDATED_KEY,
+        label: `未排日期 · ${undated} 個行程`,
+      });
+    }
+
+    return options;
+  }, [tripDates, counts, undated]);
 
   useEffect(() => {
     let cancelled = false;
@@ -225,28 +245,20 @@ export function ItineraryPage() {
       {!loading && !error && items.length > 0 && (
         <>
           <div className="datePicker">
-            <label className="datePickerLabel" htmlFor="trip-date">
+            <label
+              id="trip-date-label"
+              className="datePickerLabel"
+              htmlFor="trip-date"
+            >
               選擇日期
             </label>
-            <select
+            <Select
               id="trip-date"
-              className="dateSelect"
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-            >
-              {tripDates.map((date) => {
-                const count = counts.get(date) ?? 0;
-                return (
-                  <option key={date} value={date}>
-                    {formatTripDate(date)}
-                    {count > 0 ? ` · ${count} 個行程` : ""}
-                  </option>
-                );
-              })}
-              {undated > 0 && (
-                <option value={UNDATED_KEY}>未排日期 · {undated} 個行程</option>
-              )}
-            </select>
+              options={dateOptions}
+              onChange={setSelectedDate}
+              aria-labelledby="trip-date-label"
+            />
           </div>
 
           {dayItems.length === 0 ? (
