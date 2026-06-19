@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { EmptyDayState } from "../components/EmptyDayState";
 import { RefreshStatusButton } from "../components/RefreshStatusButton";
 import { Select } from "../components/Select";
 import { TripCard } from "../components/TripCard";
@@ -262,7 +263,7 @@ export function ItineraryPage() {
           </div>
 
           {dayItems.length === 0 ? (
-            <div className="status">這天還沒有行程安排。</div>
+            <EmptyDayState />
           ) : (
             <ol className="timeline" aria-label="行程時間軸">
               {dayItems.map((it, index) => {
