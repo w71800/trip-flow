@@ -1,0 +1,97 @@
+import type { Request, Response } from "express";
+import { z } from "zod";
+import { createSession, signAccessToken, verifyRefreshToken } from "./jwt.js";
+import { requireAuth, type AuthedRequest } from "./middleware.js";
+import {
+  authenticateWithNotion,
+  getNotionUserById,
+} from "./providers/notion.js";
+
+const LoginBodySchema = z.object({
+  id: z.string().min(1),
+  password: z.string().min(1),
+});
+
+const RefreshBodySchema = z.object({
+  refreshToken: z.string().min(1),
+});
+
+export async function handleLogin(req: Request, res: Response) {
+  const parsed = LoginBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ ok: false, error: "invalid_request" });
+    return;
+  }
+
+  try {
+    const user = await authenticateWithNotion(
+      parsed.data.id,
+      parsed.data.password,
+    );
+
+    if (!user) {
+      res.status(401).json({ ok: false, error: "invalid_credentials" });
+      return;
+    }
+
+    const session = await createSession(user);
+    res.json({ ok: true, ...session });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ ok: false, error: message });
+  }
+}
+
+export async function handleRefresh(req: Request, res: Response) {
+  const parsed = RefreshBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ ok: false, error: "invalid_request" });
+    return;
+  }
+
+  try {
+    const userId = await verifyRefreshToken(parsed.data.refreshToken);
+    const user = await getNotionUserById(userId);
+
+    if (!user) {
+      res.status(401).json({ ok: false, error: "unauthorized" });
+      return;
+    }
+
+    const access = await signAccessToken(user);
+    res.json({
+      ok: true,
+      accessToken: access.token,
+      refreshToken: parsed.data.refreshToken,
+      expiresAt: access.expiresAt,
+    });
+  } catch {
+    res.status(401).json({ ok: false, error: "unauthorized" });
+  }
+}
+
+export function handleLogout(_req: Request, res: Response) {
+  res.status(204).end();
+}
+
+export async function handleMe(req: Request, res: Response) {
+  const user = (req as AuthedRequest).user;
+  res.json({ ok: true, user });
+}
+
+export async function handleTicket(req: Request, res: Response) {
+  const user = (req as AuthedRequest).user;
+  res.json({
+    ok: true,
+    message: "票券功能開發中",
+    user,
+  });
+}
+
+export const authRouteHandlers = {
+  login: handleLogin,
+  refresh: handleRefresh,
+  logout: handleLogout,
+  me: [requireAuth, handleMe] as const,
+  ticket: [requireAuth, handleTicket] as const,
+};

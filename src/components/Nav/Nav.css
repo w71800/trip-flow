@@ -18,6 +18,38 @@
   min-height: 52px;
 }
 
+.navRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.navAuth {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.navUser {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.navAuthButton {
+  font-size: 13px;
+  padding: 7px 10px;
+}
+
+.navAuthLink {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  color: var(--text);
+}
+
 .navBrand {
   font-weight: 700;
   font-size: 15px;
@@ -81,7 +113,16 @@
     padding-bottom: 10px;
   }
 
+  .navRight {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .navList {
     justify-content: flex-start;
+  }
+
+  .navAuth {
+    justify-content: flex-end;
   }
 }

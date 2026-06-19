@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
 import { watchEnvInDev } from "./env.js";
+import { authRouteHandlers } from "./auth/routes.js";
 import { handleItinerary } from "./itinerary.js";
 import { handleNotionPage } from "./notionPage.js";
 
@@ -27,6 +28,12 @@ app.get("/api/health", (_req, res) => {
 
 app.get("/api/itinerary", handleItinerary);
 app.get("/api/pages/:key", handleNotionPage);
+
+app.post("/api/auth/login", authRouteHandlers.login);
+app.post("/api/auth/refresh", authRouteHandlers.refresh);
+app.post("/api/auth/logout", authRouteHandlers.logout);
+app.get("/api/auth/me", ...authRouteHandlers.me);
+app.get("/api/ticket", ...authRouteHandlers.ticket);
 
 if (serveFrontend) {
   app.use(express.static(distDir));
