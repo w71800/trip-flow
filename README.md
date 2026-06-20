@@ -188,7 +188,7 @@ GET /api/ticket          （需登入）
 
 ```
 server/auth/
-  types.ts              # AuthUser、Session 型別
+  types.ts              # JWT payload 型別；AuthUser/AuthSession 自 shared re-export
   jwt.ts                # 簽發 / 驗證 access、refresh token
   middleware.ts         # requireAuth（API 統一門關）
   routes.ts             # login / refresh / logout / me / ticket handlers
@@ -196,9 +196,9 @@ server/auth/
     notion.ts           # 登入時查 Notion Users DB
 
 src/auth/
-  types.ts              # 前端 Session 型別（與後端契約對齊）
-  storage.ts            # localStorage 讀寫
-  authClient.ts         # login / refresh / logout / ensureValidSession
+  types.ts              # re-export @shared/api/auth（相容舊 import）
+  storage.ts            # localStorage；AuthSessionSchema 驗證
+  authClient.ts         # login / refresh / logout；parseApiResponse
   apiFetch.ts           # 帶 token 的 fetch，自動 refresh
   AuthContext.tsx       # AuthProvider、useAuth()
   ProtectedRoute.tsx    # 路由守衛
@@ -232,6 +232,92 @@ AUTH_PROVIDER=notion
 1. **前端只認 Session 契約**（`user` + token），不關心底層是 Notion 還是 Supabase。
 2. **穩定的 `user.id`**：票券等個人資料以 `id` 對應；遷移時可將原 id 存入 Supabase `user_metadata.trip_flow_id`。
 3. **`AUTH_PROVIDER` 環境變數**：之後在 server 端新增 `providers/supabase.ts`，切換 provider 即可；前端 API 路徑（`/api/auth/*`）可維持不變。
+
+## API 契約與 Zod 驗證
+
+前端不直接接觸 Notion API 的原始 JSON。Express BFF 負責拉資料、正規化（排序、blocks/properties → HTML），再回傳**專案自訂的 JSON 契約**。契約以 **Zod schema** 為唯一真相，TypeScript 型別由 `z.infer` 推導，並在 runtime 邊界驗證。
+
+### 為什麼這樣做
+
+| 問題 | 作法 |
+|------|------|
+| Notion API / schema 變動 | 改 `server/notion*.ts` adapter，前端契約可保持不變 |
+| TypeScript 無法驗證 `fetch` JSON | Zod `.parse()` 在 server 送出前、client 收到後各驗一次 |
+| 型別與 schema 各寫一份易 drift | 只維護 `shared/api/*.ts`，型別用 `z.infer<typeof Schema>` |
+
+### 資料流
+
+```
+Notion API
+    ↓
+server/（adapter：itinerary.ts、notionPage.ts、notion*ToHtml.ts）
+    ↓  build*Payload() → SuccessResponseSchema.parse()
+sendJson(res, Schema, data)          ← Server 邊界
+    ↓
+fetch → parseApiResponse(res, Schema)  ← Client 邊界
+    ↓
+React（state + 渲染；HTML 用 dangerouslySetInnerHTML）
+```
+
+### 目錄與工具
+
+```
+shared/api/
+  common.ts           # ApiErrorSchema（{ ok: false, error }）
+  auth.ts               # 登入 / refresh / me / ticket 契約
+  itinerary.ts        # 行程 API 契約 + StoredItineraryCacheSchema
+  pages.ts            # 資訊頁 API 契約 + PageKeySchema
+  parsePayload.ts     # parseApiPayload、formatZodError
+  index.ts            # re-export
+
+server/sendJson.ts    # 回應前 schema 驗證
+src/lib/parseApiResponse.ts   # fetch 後 schema 驗證
+```
+
+匯入慣例：
+
+- 前端：`import { ItineraryResponseSchema } from "@shared/api/itinerary"`
+- Server：`import { ... } from "@shared/api/itinerary.js"`（NodeNext 需 `.js` 副檔名）
+
+### 目前已覆蓋的 API
+
+| Endpoint | 契約 | Server handler | 前端 consumer | Runtime 驗證 |
+|----------|------|----------------|---------------|--------------|
+| `GET /api/itinerary` | `shared/api/itinerary.ts` | `server/itinerary.ts` | `ItineraryPage.tsx` | ✅ builder + sendJson + parseApiResponse + localStorage |
+| `GET /api/pages/:key` | `shared/api/pages.ts` | `server/notionPage.ts` | `NotionPageView` | ✅ builder + sendJson + parseApiResponse |
+| `POST/GET /api/auth/*` | `shared/api/auth.ts` | `server/auth/routes.ts` | `authClient.ts` | ✅ sendJson + parseApiResponse + session localStorage |
+| `GET /api/ticket` | `shared/api/auth.ts` | `server/auth/routes.ts` | `TicketPage.tsx` | ✅（placeholder 訊息，契約已定） |
+
+### Schema 與 infer（簡述）
+
+- **Schema**：描述「資料應長什麼樣子」的可執行規則；`Schema.parse(data)` 在 runtime 檢查，失敗拋 `ZodError`。
+- **`z.infer<typeof Schema>`**：從 schema **自動推導** TypeScript 型別，避免 interface 與 schema 重複維護。
+- **成功 / 失敗回應**：使用 `z.discriminatedUnion("ok", [SuccessSchema, ApiErrorSchema])`，前端以 `if (!json.ok)` 處理錯誤。
+
+範例（行程項目）：
+
+```ts
+export const ItineraryItemSchema = z.object({
+  flowId: z.string(),
+  order: z.number().int().positive(),
+  title: z.string(),
+  html: z.string(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  nextFlowId: z.string().nullable(),
+  prevFlowId: z.string().nullable(),
+});
+
+export type ItineraryItem = z.infer<typeof ItineraryItemSchema>;
+```
+
+### 新增或修改 API 時
+
+1. 在 `shared/api/` 新增或擴充 Zod schema 與 `z.infer` 型別
+2. Server：`build*Payload()` 末尾 `.parse()`；所有回應走 `sendJson`
+3. Client：`parseApiResponse(res, *ResponseSchema)`；localStorage 若有則加 `Stored*Schema`
+4. 執行 `npm run typecheck`
+
+給 AI / 協作者的 procedural checklist：`.cursor/skills/add-api/SKILL.md`（新增 endpoint 時優先閱讀）。新增 Notion 資訊頁另見 `.cursor/skills/add-notion-page/SKILL.md`。
 
 ## 快取策略
 

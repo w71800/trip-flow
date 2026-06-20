@@ -32,18 +32,25 @@ description: >-
 
 ## Agent 實作步驟
 
-### 1. 後端 `server/notionPage.ts`
+### 1. 契約 `shared/api/pages.ts`
 
 - [ ] `PageKeySchema` 的 `z.enum([...])` 加入新 key
+- [ ] 確認 `PageSuccessResponseSchema` / `PageResponseSchema` 仍適用（通常不需改）
+
+### 2. 後端 `server/notionPage.ts`
+
 - [ ] `EnvSchema` 加入 `NOTION_{KEY_UPPER}_PAGE_ID`（optional string）
 - [ ] `DEFAULT_PAGE_IDS` 加入該 key（預設可為 `""`）
 - [ ] `resolvePageId()` 加入對應分支：讀 `env.NOTION_{KEY}_PAGE_ID`，無值時拋錯或 fallback
+- [ ] `buildPagePayload()` 回傳前已由 `PageSuccessResponseSchema.parse()` 驗證；回應用 `sendJson`
+
+> `PageKeySchema` 已移至 `shared/api/pages.ts`，勿在 `notionPage.ts` 重複定義。
 
 環境變數命名：`NOTION_FLIGHT_PAGE_ID` → 新頁用 `NOTION_{SCREAMING_SNAKE}_PAGE_ID`（key `transport` → `NOTION_TRANSPORT_PAGE_ID`）。
 
 `server/index.ts` 已有 `app.get("/api/pages/:key", handleNotionPage)`，通常不需改。
 
-### 2. 前端頁面 `src/pages/{PascalCase}Page.tsx`
+### 3. 前端頁面 `src/pages/{PascalCase}Page.tsx`
 
 ```tsx
 import { NotionPageView } from "../components/NotionPage";
@@ -53,15 +60,11 @@ export function TransportPage() {
 }
 ```
 
-### 3. 擴充 `NotionPageView` 的 `pageKey` union
+### 4. 擴充 `NotionPageView` 的 `pageKey`
 
-`src/components/NotionPage/NotionPage.tsx`：
+`PageKey` 型別來自 `@shared/api/pages`（隨 `PageKeySchema` 自動更新）。若 TypeScript 報錯，確認 `shared/api/pages.ts` 已加入新 key。
 
-```ts
-pageKey: "flight" | "accommodation" | "transport";
-```
-
-### 4. 路由 `src/App.tsx`
+### 5. 路由 `src/App.tsx`
 
 在 `<Route element={<Layout />}>` 內新增：
 
@@ -69,18 +72,18 @@ pageKey: "flight" | "accommodation" | "transport";
 <Route path="transport" element={<TransportPage />} />
 ```
 
-### 5. 導覽列 `src/components/Nav/`
+### 6. 導覽列 `src/components/Nav/`
 
 - [ ] `NavIcons.tsx`：新增對應 SVG icon 元件
 - [ ] `Nav.tsx`：`navItems` 加入 `{ to: "/transport", label: "交通資訊", end: false, Icon: TransportIcon }`
 
-### 6. `.env.example`
+### 7. `.env.example`
 
 ```env
 # NOTION_TRANSPORT_PAGE_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-### 7. 驗證
+### 8. 驗證
 
 ```bash
 npm run typecheck

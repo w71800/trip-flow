@@ -1,0 +1,13 @@
+---
+description: BFF API 必須使用 shared/api Zod 契約，禁止前端直接依賴 Notion 結構
+globs: shared/api/**,server/**/*.ts,src/pages/**,src/components/**,src/lib/parseApiResponse.ts,src/lib/itineraryCache.ts
+alwaysApply: false
+---
+
+# API 契約慣例
+
+- **契約唯一來源**：`shared/api/`（Zod schema + `z.infer` 型別）
+- **Server 輸出**：`sendJson(res, *SuccessResponseSchema, data)`（`server/sendJson.ts`）
+- **Client 輸入**：`parseApiResponse(res, *ResponseSchema)`（`src/lib/parseApiResponse.ts`）
+- **Notion 轉換**留在 `server/notion*.ts`、`server/itinerary.ts`；前端只消費穩定 JSON
+- 新增 endpoint 或改 response 形狀：先讀 `.cursor/skills/add-api/SKILL.md`
