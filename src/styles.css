@@ -1,10 +1,4 @@
-:root {
-  --bg: #f6f7f8;
-  --card: #ffffff;
-  --text: #111827;
-  --muted: #6b7280;
-  --border: rgba(17, 24, 39, 0.12);
-}
+@import "./styles/tokens.css";
 
 * {
   box-sizing: border-box;
@@ -19,9 +13,10 @@ body {
 }
 
 .page {
-  max-width: 1100px;
+  max-width: var(--layout-max-width);
   margin: 0 auto;
-  padding: 24px 16px 48px;
+  padding: var(--layout-page-padding-y) var(--layout-page-padding-x)
+    var(--layout-page-padding-bottom);
 }
 
 .header {

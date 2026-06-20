@@ -1,21 +1,23 @@
+@import "../../styles/tokens.css";
+
 .nav {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: var(--z-nav);
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
 }
 
 .navInner {
-  max-width: 1100px;
+  max-width: var(--layout-max-width);
   margin: 0 auto;
-  padding: 0 16px;
+  padding: 0 var(--layout-page-padding-x);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 52px;
+  min-height: var(--nav-height);
 }
 
 .navLeft {
@@ -131,14 +133,14 @@
 .navOverlay {
   position: fixed;
   inset: 0;
-  z-index: 30;
+  z-index: var(--z-overlay);
   border: 0;
   padding: 0;
   background: rgba(17, 24, 39, 0.35);
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s ease-out;
+  transition: opacity var(--duration-sidebar) var(--easing-default);
 }
 
 .navOverlay.isOpen {
@@ -150,8 +152,8 @@
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 40;
-  width: min(280px, 85vw);
+  z-index: var(--z-sidebar);
+  width: min(var(--nav-sidebar-width), 85vw);
   height: 100dvh;
   background: var(--card);
   border-right: 1px solid var(--border);
@@ -160,7 +162,7 @@
   flex-direction: column;
   padding: 12px 12px 20px;
   transform: translateX(-100%);
-  transition: transform 0.2s ease-out;
+  transition: transform var(--duration-sidebar) var(--easing-default);
 }
 
 .navSidebar.isOpen {
@@ -203,34 +205,10 @@
   width: 100%;
 }
 
-@media (max-width: 520px) {
-  .navInner {
-    flex-direction: column;
-    align-items: stretch;
-    padding-top: 10px;
-    padding-bottom: 10px;
-  }
-
-  .navRight {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .navListDesktop {
-    justify-content: flex-start;
-  }
-
-  .navAuth {
-    justify-content: flex-end;
-  }
-}
-
-@media (max-width: 389px) {
+@media (--mobile) {
   .navInner {
     flex-direction: row;
     align-items: center;
-    padding-top: 0;
-    padding-bottom: 0;
     gap: 10px;
   }
 
@@ -256,9 +234,5 @@
 
   .navAuth {
     justify-content: flex-end;
-  }
-
-  .navUser {
-    max-width: 88px;
   }
 }

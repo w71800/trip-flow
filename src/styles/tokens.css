@@ -1,0 +1,44 @@
+/**
+ * Design tokens — colors, layout, motion, breakpoints.
+ * Media queries use @custom-media below; :root values mirror them for JS (see tokens.ts).
+ */
+
+@custom-media --mobile (max-width: 768px);
+
+:root {
+  /* Breakpoints (mirror @custom-media; for JS / documentation) */
+  --breakpoint-mobile: 768px;
+
+  /* Colors */
+  --color-bg: #f6f7f8;
+  --color-card: #ffffff;
+  --color-text: #111827;
+  --color-muted: #6b7280;
+  --color-border: rgba(17, 24, 39, 0.12);
+
+  /* Semantic aliases (used across components) */
+  --bg: var(--color-bg);
+  --card: var(--color-card);
+  --text: var(--color-text);
+  --muted: var(--color-muted);
+  --border: var(--color-border);
+
+  /* Layout */
+  --layout-max-width: 1100px;
+  --layout-page-padding-x: 16px;
+  --layout-page-padding-y: 24px;
+  --layout-page-padding-bottom: 48px;
+
+  /* Nav */
+  --nav-height: 52px;
+  --nav-sidebar-width: 280px;
+
+  /* Motion */
+  --duration-sidebar: 200ms;
+  --easing-default: ease-out;
+
+  /* Z-index */
+  --z-nav: 20;
+  --z-overlay: 30;
+  --z-sidebar: 40;
+}

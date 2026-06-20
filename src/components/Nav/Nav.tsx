@@ -9,6 +9,7 @@ import {
   TicketIcon,
   TimelineIcon,
 } from "./NavIcons";
+import { tokens } from "../../styles/tokens";
 import "./Nav.css";
 
 const navItems = [
@@ -17,8 +18,6 @@ const navItems = [
   { to: "/accommodation", label: "住宿資訊", end: false, Icon: AccommodationIcon },
   { to: "/ticket", label: "票券", end: false, Icon: TicketIcon },
 ] as const;
-
-const SIDEBAR_ANIMATION_MS = 200;
 
 function NavLinks({
   className,
@@ -103,7 +102,7 @@ export function Nav() {
 
     const timer = window.setTimeout(() => {
       setMenuMounted(false);
-    }, SIDEBAR_ANIMATION_MS);
+    }, tokens.sidebarAnimationMs);
 
     return () => clearTimeout(timer);
   }, [menuActive, menuMounted]);
