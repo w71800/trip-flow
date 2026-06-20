@@ -1,10 +1,13 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
+import {
+  PageKeySchema,
+  type PageKey,
+  type PageSuccessResponse,
+} from "@shared/api/pages.js";
 import { reloadEnv } from "./env.js";
 import { getNotionClient } from "./notion.js";
 import { fetchPageMeta, pageBlocksToHtml } from "./notionPageBlocks.js";
-
-const PageKeySchema = z.enum(["flight", "accommodation"]);
 
 const EnvSchema = z.object({
   NOTION_TOKEN: z.string().min(1),
@@ -14,29 +17,16 @@ const EnvSchema = z.object({
   NOTION_PAGE_CACHE_MAX_AGE: z.string().optional(),
 });
 
-const DEFAULT_PAGE_IDS: Record<z.infer<typeof PageKeySchema>, string> = {
+const DEFAULT_PAGE_IDS: Record<PageKey, string> = {
   flight: "384ffcbed6738011a42ecf60573ff254",
   accommodation: "",
 };
 
 type PageCacheEntry = {
   etag: string;
-  payload: PagePayload;
+  payload: PageSuccessResponse;
   savedAt: number;
   pageId: string;
-};
-
-type PagePayload = {
-  ok: true;
-  key: string;
-  title: string;
-  icon: string | null;
-  html: string;
-  meta: {
-    fetchedAt: string;
-    lastEditedTime?: string;
-    cached?: boolean;
-  };
 };
 
 const pageCache = new Map<string, PageCacheEntry>();
@@ -56,7 +46,7 @@ function getEnv() {
   return parsed.data;
 }
 
-function resolvePageId(key: z.infer<typeof PageKeySchema>, env: ReturnType<typeof getEnv>): string {
+function resolvePageId(key: PageKey, env: ReturnType<typeof getEnv>): string {
   if (key === "flight") {
     const id = env.NOTION_FLIGHT_PAGE_ID ?? DEFAULT_PAGE_IDS.flight;
     if (!id) throw new Error("缺少 NOTION_FLIGHT_PAGE_ID");
@@ -83,9 +73,9 @@ function parseIfNoneMatch(header: string | undefined): string | null {
 }
 
 async function buildPagePayload(
-  key: z.infer<typeof PageKeySchema>,
+  key: PageKey,
   env: ReturnType<typeof getEnv>,
-): Promise<PagePayload> {
+): Promise<PageSuccessResponse> {
   const notion = getNotionClient();
   const pageId = resolvePageId(key, env);
   const maxBlocks = Number(env.NOTION_PAGE_BLOCKS_MAX ?? "200");

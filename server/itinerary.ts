@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
+import type { ItineraryItem, ItinerarySuccessResponse } from "@shared/api/itinerary.js";
 import {
   buildFingerprint,
   canReuseFingerprint,
@@ -379,13 +380,13 @@ async function prepareItineraryContext(env: ReturnType<typeof getEnv>): Promise<
   };
 }
 
-async function buildItineraryPayload(ctx: ItineraryContext): Promise<ItineraryCachePayload> {
+async function buildItineraryPayload(ctx: ItineraryContext): Promise<ItinerarySuccessResponse> {
   const orderedIds = buildOrder(ctx.linkedNodes);
   const maxCards = Number(ctx.env.NOTION_MAX_CARDS ?? "50");
   const maxRenderBlocks = Number(ctx.env.NOTION_BLOCKS_MAX_RENDER ?? "12");
   const maxFetchBlocks = Number(ctx.env.NOTION_BLOCKS_MAX_FETCH ?? "60");
 
-  const items: any[] = [];
+  const items: ItineraryItem[] = [];
   let order = 1;
 
   for (const id of orderedIds) {

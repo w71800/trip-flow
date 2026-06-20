@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ItineraryItem, ItineraryMeta, ItineraryResponse } from "@shared/api/itinerary";
 import { EmptyDayState } from "../components/EmptyDayState";
 import { RefreshStatusButton } from "../components/RefreshStatusButton";
 import { Select } from "../components/Select";
@@ -7,31 +8,6 @@ import { CacheStatus } from "../lib/cacheStatus";
 import { loadItineraryCache, saveItineraryCache } from "../lib/itineraryCache";
 import { formatTripDate, generateDateRange } from "../lib/tripDates";
 import "./ItineraryPage.css";
-
-type ItineraryItem = {
-  flowId: string;
-  order: number;
-  title: string;
-  html: string;
-  date: string | null;
-  nextFlowId: string | null;
-  prevFlowId: string | null;
-};
-
-type ItineraryMeta = {
-  fetchedAt?: string;
-  tripStart?: string;
-  tripEnd?: string;
-  cached?: boolean;
-};
-
-type ApiResponse =
-  | {
-      ok: true;
-      items: ItineraryItem[];
-      meta?: ItineraryMeta;
-    }
-  | { ok: false; error: string };
 
 const DEFAULT_TRIP_START = "2026-07-16";
 const DEFAULT_TRIP_END = "2026-07-23";
@@ -155,7 +131,7 @@ export function ItineraryPage() {
     let cancelled = false;
     const controller = new AbortController();
 
-    function applyItinerary(nextItems: ItineraryItem[], meta?: ItineraryMeta) {
+    function applyItinerary(nextItems: ItineraryItem[], meta?: Partial<ItineraryMeta>) {
       const start = meta?.tripStart ?? DEFAULT_TRIP_START;
       const end = meta?.tripEnd ?? DEFAULT_TRIP_END;
       const dates = generateDateRange(start, end);
@@ -207,7 +183,7 @@ export function ItineraryPage() {
           return;
         }
 
-        const json = (await res.json()) as ApiResponse;
+        const json = (await res.json()) as ItineraryResponse;
         if (!json.ok) {
           if (!hasLocalCache) {
             setError(json.error);

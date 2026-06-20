@@ -1,15 +1,7 @@
 import { createHash } from "node:crypto";
+import type { ItinerarySuccessResponse } from "@shared/api/itinerary.js";
 
-export type ItineraryCachePayload = {
-  ok: true;
-  items: unknown[];
-  meta: {
-    fetchedAt: string;
-    tripStart: string;
-    tripEnd: string;
-    cached: boolean;
-  };
-};
+export type ItineraryCachePayload = ItinerarySuccessResponse;
 
 type ItineraryCacheEntry = {
   etag: string;

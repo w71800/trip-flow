@@ -6,8 +6,12 @@
     "moduleResolution": "NodeNext",
     "types": ["node"],
     "isolatedModules": true,
-    "lib": ["ES2022"]
+    "lib": ["ES2022"],
+    "baseUrl": "..",
+    "paths": {
+      "@shared/*": ["shared/*"]
+    }
   },
-  "include": ["./**/*.ts"]
+  "include": ["./**/*.ts", "../shared/**/*.ts"]
 }
 

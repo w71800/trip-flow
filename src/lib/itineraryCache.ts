@@ -1,24 +1,9 @@
-type ItineraryItem = {
-  flowId: string;
-  order: number;
-  title: string;
-  html: string;
-  date: string | null;
-  nextFlowId: string | null;
-  prevFlowId: string | null;
-};
-
-type ItineraryMeta = {
-  fetchedAt?: string;
-  tripStart?: string;
-  tripEnd?: string;
-  cached?: boolean;
-};
+import type { ItineraryItem, ItineraryMeta } from "@shared/api/itinerary";
 
 export type StoredItineraryCache = {
   etag: string;
   items: ItineraryItem[];
-  meta: ItineraryMeta;
+  meta: Partial<ItineraryMeta>;
   savedAt: string;
 };
 

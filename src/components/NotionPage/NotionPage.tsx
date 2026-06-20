@@ -1,27 +1,11 @@
+import type { PageKey, PageResponse } from "@shared/api/pages";
 import { useEffect, useMemo, useState } from "react";
 import { RefreshStatusButton } from "../RefreshStatusButton";
 import { CacheStatus } from "../../lib/cacheStatus";
 import "./NotionPage.css";
 
-type PageMeta = {
-  fetchedAt?: string;
-  lastEditedTime?: string;
-  cached?: boolean;
-};
-
-type PageResponse =
-  | {
-      ok: true;
-      key: string;
-      title: string;
-      icon: string | null;
-      html: string;
-      meta?: PageMeta;
-    }
-  | { ok: false; error: string };
-
 type NotionPageViewProps = {
-  pageKey: "flight" | "accommodation";
+  pageKey: PageKey;
 };
 
 function isEmojiIcon(icon: string | null): boolean {
