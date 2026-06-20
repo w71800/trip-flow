@@ -6,8 +6,10 @@ import express from "express";
 import cors from "cors";
 import { watchEnvInDev } from "./env.js";
 import { authRouteHandlers } from "./auth/routes.js";
-import { handleItinerary } from "./itinerary.js";
-import { handleNotionPage } from "./notionPage.js";
+import { handleItinerary, handleTripItinerary } from "./itinerary.js";
+import { handleNotionPage, handleTripNotionPage } from "./notionPage.js";
+import { handleTripDetail, handleTripsList } from "./trips/handlers.js";
+import { requireAuth } from "./auth/middleware.js";
 
 watchEnvInDev();
 
@@ -26,6 +28,11 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true, service: "trip-flow" });
 });
 
+app.get("/api/trips", requireAuth, handleTripsList);
+app.get("/api/trips/:slug", handleTripDetail);
+app.get("/api/trips/:slug/itinerary", handleTripItinerary);
+app.get("/api/trips/:slug/pages/:key", handleTripNotionPage);
+
 app.get("/api/itinerary", handleItinerary);
 app.get("/api/pages/:key", handleNotionPage);
 
@@ -33,6 +40,8 @@ app.post("/api/auth/login", authRouteHandlers.login);
 app.post("/api/auth/refresh", authRouteHandlers.refresh);
 app.post("/api/auth/logout", authRouteHandlers.logout);
 app.get("/api/auth/me", ...authRouteHandlers.me);
+app.get("/api/trips/:slug/ticket", ...authRouteHandlers.tripTicket);
+
 app.get("/api/ticket", ...authRouteHandlers.ticket);
 
 if (serveFrontend) {

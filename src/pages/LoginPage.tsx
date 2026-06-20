@@ -72,7 +72,7 @@ export function LoginPage() {
         </form>
 
         <p className="loginBack">
-          <Link to="/">返回行程時間軸</Link>
+          <Link to="/">返回我的旅行</Link>
         </p>
       </div>
     </div>

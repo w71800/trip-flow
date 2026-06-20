@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { RefreshStatusButton } from "../RefreshStatusButton";
 import { CacheStatus } from "../../lib/cacheStatus";
 import { parseApiResponse } from "../../lib/parseApiResponse";
+import { useTrip } from "../../trip/TripContext";
 import "./NotionPage.css";
 
 type NotionPageViewProps = {
@@ -15,6 +16,7 @@ function isEmojiIcon(icon: string | null): boolean {
 }
 
 export function NotionPageView({ pageKey }: NotionPageViewProps) {
+  const { slug, error: tripError, isLoading: tripLoading } = useTrip();
   const [title, setTitle] = useState("");
   const [icon, setIcon] = useState<string | null>(null);
   const [html, setHtml] = useState("");
@@ -26,12 +28,14 @@ export function NotionPageView({ pageKey }: NotionPageViewProps) {
   const apiUrl = useMemo(
     () =>
       refreshNonce > 0
-        ? `/api/pages/${pageKey}?refresh=1&_=${refreshNonce}`
-        : `/api/pages/${pageKey}`,
-    [pageKey, refreshNonce],
+        ? `/api/trips/${encodeURIComponent(slug)}/pages/${pageKey}?refresh=1&_=${refreshNonce}`
+        : `/api/trips/${encodeURIComponent(slug)}/pages/${pageKey}`,
+    [slug, pageKey, refreshNonce],
   );
 
   useEffect(() => {
+    if (!slug || tripError) return;
+
     let cancelled = false;
     const controller = new AbortController();
 
@@ -78,7 +82,7 @@ export function NotionPageView({ pageKey }: NotionPageViewProps) {
       cancelled = true;
       controller.abort();
     };
-  }, [apiUrl]);
+  }, [apiUrl, slug, tripError]);
 
   function handleRefresh() {
     setCacheStatus(CacheStatus.Loading);
@@ -105,21 +109,30 @@ export function NotionPageView({ pageKey }: NotionPageViewProps) {
           <h1 className="notionPageTitle">{title || "載入中…"}</h1>
         </header>
 
-        {loading && <div className="notionPageStatus">載入中…</div>}
-        {error && (
+        {tripLoading && <div className="notionPageStatus">載入旅行資訊…</div>}
+        {tripError && (
+          <div className="notionPageStatus notionPageError" role="alert">
+            {tripError}
+          </div>
+        )}
+
+        {!tripLoading && !tripError && loading && (
+          <div className="notionPageStatus">載入中…</div>
+        )}
+        {!tripLoading && !tripError && error && (
           <div className="notionPageStatus notionPageError" role="alert">
             {error}
           </div>
         )}
 
-        {!loading && !error && html.trim() && (
+        {!tripLoading && !tripError && !loading && !error && html.trim() && (
           <div
             className="notionPageContent"
             dangerouslySetInnerHTML={{ __html: html }}
           />
         )}
 
-        {!loading && !error && !html.trim() && (
+        {!tripLoading && !tripError && !loading && !error && !html.trim() && (
           <div className="notionPageStatus">此頁面目前沒有可顯示的內容。</div>
         )}
       </article>

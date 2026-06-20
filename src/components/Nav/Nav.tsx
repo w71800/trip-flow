@@ -1,6 +1,7 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
+import { useTripOptional } from "../../trip/TripContext";
 import {
   AccommodationIcon,
   CloseIcon,
@@ -12,23 +13,41 @@ import {
 import { tokens } from "../../styles/tokens";
 import "./Nav.css";
 
-const navItems = [
-  { to: "/", label: "行程時間軸", end: true, Icon: TimelineIcon },
-  { to: "/flight", label: "飛機資訊", end: false, Icon: FlightIcon },
-  { to: "/accommodation", label: "住宿資訊", end: false, Icon: AccommodationIcon },
-  { to: "/ticket", label: "票券", end: false, Icon: TicketIcon },
+const overviewNavItems = [
+  { to: "/", label: "我的旅行", end: true, Icon: TimelineIcon },
 ] as const;
+
+function buildTripNavItems(tripSlug: string) {
+  return [
+    { to: `/${tripSlug}`, label: "行程時間軸", end: true, Icon: TimelineIcon },
+    { to: `/${tripSlug}/flight`, label: "飛機資訊", end: false, Icon: FlightIcon },
+    {
+      to: `/${tripSlug}/accommodation`,
+      label: "住宿資訊",
+      end: false,
+      Icon: AccommodationIcon,
+    },
+    { to: `/${tripSlug}/ticket`, label: "票券", end: false, Icon: TicketIcon },
+  ] as const;
+}
 
 function NavLinks({
   className,
   onNavigate,
+  items,
 }: {
   className?: string;
   onNavigate?: () => void;
+  items: ReadonlyArray<{
+    to: string;
+    label: string;
+    end: boolean;
+    Icon: typeof TimelineIcon;
+  }>;
 }) {
   return (
     <ul className={className}>
-      {navItems.map((item) => (
+      {items.map((item) => (
         <li key={item.to}>
           <NavLink
             to={item.to}
@@ -46,12 +65,23 @@ function NavLinks({
 }
 
 export function Nav() {
+  const tripContext = useTripOptional();
   const { session, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const sidebarId = useId();
   const [menuMounted, setMenuMounted] = useState(false);
   const [menuActive, setMenuActive] = useState(false);
+
+  const navItems = useMemo(() => {
+    if (tripContext?.slug) {
+      return buildTripNavItems(tripContext.slug);
+    }
+    return overviewNavItems;
+  }, [tripContext?.slug]);
+
+  const brandLabel = tripContext?.trip?.displayName ?? "Trip Flow";
+  const brandTo = tripContext?.slug ? `/${tripContext.slug}` : "/";
 
   async function handleLogout() {
     await signOut();
@@ -142,13 +172,19 @@ export function Nav() {
               {menuActive ? <CloseIcon /> : <MenuIcon />}
             </button>
 
-            <NavLink to="/" className="navBrand" end>
-              Trip Flow
+            <NavLink to={brandTo} className="navBrand" end>
+              {brandLabel}
             </NavLink>
+
+            {tripContext?.slug ? (
+              <Link to="/" className="navBackToOverview">
+                所有旅行
+              </Link>
+            ) : null}
           </div>
 
           <div className="navRight">
-            <NavLinks className="navList navListDesktop" />
+            <NavLinks className="navList navListDesktop" items={navItems} />
 
             <div className="navAuth">
               {session ? (
@@ -193,7 +229,11 @@ export function Nav() {
                 <CloseIcon />
               </button>
             </div>
-            <NavLinks className="navList navListSidebar" onNavigate={closeMenu} />
+            <NavLinks
+              className="navList navListSidebar"
+              onNavigate={closeMenu}
+              items={navItems}
+            />
           </aside>
         </>
       ) : null}

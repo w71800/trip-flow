@@ -20,6 +20,8 @@ import { getNotionClient } from "./notion.js";
 import { blocksToHtml } from "./notionBlocksToHtml.js";
 import { propertiesToHtml } from "./notionPropertiesToHtml.js";
 import { sendJson } from "./sendJson.js";
+import { resolveTripConfig } from "./trips/resolveTripConfig.js";
+import type { TripConfig } from "./trips/types.js";
 
 const EnvSchema = z.object({
   NOTION_TOKEN: z.string().min(1),
@@ -38,12 +40,36 @@ const EnvSchema = z.object({
   ITINERARY_FINGERPRINT_TTL: z.string().optional(),
 });
 
-function getEnv() {
+export type ItineraryRunConfig = {
+  flowDatabaseId: string;
+  flowTitleProperty?: string;
+  flowNextProperty?: string;
+  flowPreviousProperty?: string;
+  flowDetailsProperty?: string;
+  flowDateProperty?: string;
+  tripStart: string;
+  tripEnd: string;
+  tripSlug?: string;
+  tripDisplayName?: string;
+  blocksMaxRender: number;
+  blocksMaxFetch: number;
+  maxCards: number;
+  cacheMaxAge: number;
+  fingerprintTtlMs: number;
+};
+
+const LEGACY_CACHE_SLUG = "__legacy__";
+
+function getLegacyEnv() {
   const parsed = EnvSchema.safeParse(process.env);
   if (!parsed.success) {
     const missingVars = parsed.error.issues
-      .filter((i) => (i as any).code === "invalid_type")
-      .filter((i) => (i as any).received === "undefined" || (i as any).received === undefined)
+      .filter((i) => (i as { code?: string }).code === "invalid_type")
+      .filter(
+        (i) =>
+          (i as { received?: string }).received === "undefined" ||
+          (i as { received?: string }).received === undefined,
+      )
       .map((i) => i.path.join("."))
       .filter(Boolean);
 
@@ -54,6 +80,46 @@ function getEnv() {
     throw new Error(parsed.error.issues.map((i) => i.message).join("; "));
   }
   return parsed.data;
+}
+
+function buildRunConfigFromEnv(): ItineraryRunConfig {
+  const env = getLegacyEnv();
+  return {
+    flowDatabaseId: env.NOTION_FLOW_DATABASE_ID,
+    flowTitleProperty: env.NOTION_FLOW_TITLE_PROPERTY,
+    flowNextProperty: env.NOTION_FLOW_NEXT_PROPERTY,
+    flowPreviousProperty: env.NOTION_FLOW_PREVIOUS_PROPERTY,
+    flowDetailsProperty: env.NOTION_FLOW_DETAILS_PROPERTY,
+    flowDateProperty: env.NOTION_FLOW_DATE_PROPERTY,
+    tripStart: env.TRIP_START_DATE ?? "2026-07-16",
+    tripEnd: env.TRIP_END_DATE ?? "2026-07-23",
+    blocksMaxRender: Number(env.NOTION_BLOCKS_MAX_RENDER ?? "12"),
+    blocksMaxFetch: Number(env.NOTION_BLOCKS_MAX_FETCH ?? "60"),
+    maxCards: Number(env.NOTION_MAX_CARDS ?? "50"),
+    cacheMaxAge: Number(env.ITINERARY_CACHE_MAX_AGE ?? "86400"),
+    fingerprintTtlMs: Number(env.ITINERARY_FINGERPRINT_TTL ?? "3600") * 1000,
+  };
+}
+
+function buildRunConfigFromTrip(trip: TripConfig): ItineraryRunConfig {
+  const env = process.env;
+  return {
+    flowDatabaseId: trip.flowDatabaseId,
+    flowTitleProperty: env.NOTION_FLOW_TITLE_PROPERTY,
+    flowNextProperty: env.NOTION_FLOW_NEXT_PROPERTY,
+    flowPreviousProperty: env.NOTION_FLOW_PREVIOUS_PROPERTY,
+    flowDetailsProperty: env.NOTION_FLOW_DETAILS_PROPERTY,
+    flowDateProperty: env.NOTION_FLOW_DATE_PROPERTY,
+    tripStart: trip.tripStart,
+    tripEnd: trip.tripEnd,
+    tripSlug: trip.slug,
+    tripDisplayName: trip.displayName,
+    blocksMaxRender: Number(env.NOTION_BLOCKS_MAX_RENDER ?? "12"),
+    blocksMaxFetch: Number(env.NOTION_BLOCKS_MAX_FETCH ?? "60"),
+    maxCards: Number(env.NOTION_MAX_CARDS ?? "50"),
+    cacheMaxAge: Number(env.ITINERARY_CACHE_MAX_AGE ?? "86400"),
+    fingerprintTtlMs: Number(env.ITINERARY_FINGERPRINT_TTL ?? "3600") * 1000,
+  };
 }
 
 function getTitleFromPage(page: any, titlePropertyName: string): string {
@@ -162,7 +228,7 @@ async function resolveDataSource(notion: any, dbId: string) {
 
     if (!childDbBlock?.id) {
       throw new Error(
-        "NOTION_FLOW_DATABASE_ID 似乎不是 database id。請填入 flow database 的 ID。",
+        "flow_database_id 似乎不是 database id。請填入 flow database 的 ID。",
       );
     }
 
@@ -175,7 +241,7 @@ async function resolveDataSource(notion: any, dbId: string) {
 
   if (!dataSourceId) {
     throw new Error(
-      "此 database 沒有 data source；請確認 NOTION_FLOW_DATABASE_ID 是否為正確的 flow database。",
+      "此 database 沒有 data source；請確認 flow_database_id 是否為正確的 flow database。",
     );
   }
 
@@ -248,7 +314,7 @@ function buildOrder(nodesById: Map<string, any>) {
 }
 
 type ItineraryContext = {
-  env: ReturnType<typeof getEnv>;
+  config: ItineraryRunConfig;
   notion: ReturnType<typeof getNotionClient>;
   dataSourceId: string;
   dataSource: any;
@@ -311,30 +377,30 @@ async function collectContentTimestamps(
   return timestamps;
 }
 
-async function prepareItineraryContext(env: ReturnType<typeof getEnv>): Promise<ItineraryContext> {
+async function prepareItineraryContext(config: ItineraryRunConfig): Promise<ItineraryContext> {
   const notion = getNotionClient();
   const { dataSourceId, dataSource } = await resolveDataSource(
     notion,
-    env.NOTION_FLOW_DATABASE_ID,
+    config.flowDatabaseId,
   );
 
-  const titlePropertyName = pickTitlePropertyName(dataSource, env.NOTION_FLOW_TITLE_PROPERTY);
+  const titlePropertyName = pickTitlePropertyName(dataSource, config.flowTitleProperty);
   const nextPropertyName = pickRelationPropertyName(
     dataSource,
-    env.NOTION_FLOW_NEXT_PROPERTY,
+    config.flowNextProperty,
     "next",
   );
   const prevPropertyName = pickRelationPropertyName(
     dataSource,
-    env.NOTION_FLOW_PREVIOUS_PROPERTY,
+    config.flowPreviousProperty,
     "previous",
   );
   const detailsPropertyName = pickRelationPropertyName(
     dataSource,
-    env.NOTION_FLOW_DETAILS_PROPERTY,
+    config.flowDetailsProperty,
     "details",
   );
-  const datePropertyName = pickDatePropertyName(dataSource, env.NOTION_FLOW_DATE_PROPERTY);
+  const datePropertyName = pickDatePropertyName(dataSource, config.flowDateProperty);
 
   if (!nextPropertyName || !prevPropertyName) {
     throw new Error(
@@ -371,7 +437,7 @@ async function prepareItineraryContext(env: ReturnType<typeof getEnv>): Promise<
   }
 
   return {
-    env,
+    config,
     notion,
     dataSourceId,
     dataSource,
@@ -388,22 +454,21 @@ async function prepareItineraryContext(env: ReturnType<typeof getEnv>): Promise<
 
 async function buildItineraryPayload(ctx: ItineraryContext): Promise<ItinerarySuccessResponse> {
   const orderedIds = buildOrder(ctx.linkedNodes);
-  const maxCards = Number(ctx.env.NOTION_MAX_CARDS ?? "50");
-  const maxRenderBlocks = Number(ctx.env.NOTION_BLOCKS_MAX_RENDER ?? "12");
-  const maxFetchBlocks = Number(ctx.env.NOTION_BLOCKS_MAX_FETCH ?? "60");
 
   const items: ItineraryItem[] = [];
   let order = 1;
 
   for (const id of orderedIds) {
-    if (items.length >= maxCards) break;
+    if (items.length >= ctx.config.maxCards) break;
     const node = ctx.linkedNodes.get(id);
     if (!node) continue;
 
     const page = ctx.pageById.get(id);
     const contentPageId = node.detailsId ?? node.id;
-    const blocks = await getPageBlocks(ctx.notion, contentPageId, maxFetchBlocks);
-    const { html: blockHtml } = await blocksToHtml(blocks, { maxBlocks: maxRenderBlocks });
+    const blocks = await getPageBlocks(ctx.notion, contentPageId, ctx.config.blocksMaxFetch);
+    const { html: blockHtml } = await blocksToHtml(blocks, {
+      maxBlocks: ctx.config.blocksMaxRender,
+    });
     const blockHtmlTrim = blockHtml.trim();
 
     const skipProps = [
@@ -429,90 +494,119 @@ async function buildItineraryPayload(ctx: ItineraryContext): Promise<ItinerarySu
     order++;
   }
 
-  const tripStart = ctx.env.TRIP_START_DATE ?? "2026-07-16";
-  const tripEnd = ctx.env.TRIP_END_DATE ?? "2026-07-23";
-
   return ItinerarySuccessResponseSchema.parse({
     ok: true,
     items,
     meta: {
       fetchedAt: new Date().toISOString(),
-      tripStart,
-      tripEnd,
+      tripStart: ctx.config.tripStart,
+      tripEnd: ctx.config.tripEnd,
+      tripSlug: ctx.config.tripSlug,
+      tripDisplayName: ctx.config.tripDisplayName,
       cached: false,
     },
   });
 }
 
+async function handleItineraryWithConfig(
+  req: Request,
+  res: Response,
+  config: ItineraryRunConfig,
+  cacheSlug: string,
+) {
+  const forceRefresh = req.query.refresh === "1";
+  const ifNoneMatch = parseIfNoneMatch(req.header("if-none-match"));
+
+  if (!forceRefresh && canReuseFingerprint(cacheSlug, config.fingerprintTtlMs)) {
+    const etag = getCurrentItineraryEtag(cacheSlug);
+    const cachedPayload = etag ? getItineraryCache(cacheSlug, etag) : null;
+    if (etag && cachedPayload) {
+      setItineraryResponseHeaders(res, etag, config.cacheMaxAge);
+      if (ifNoneMatch === etag) {
+        res.status(304).end();
+        return;
+      }
+
+      sendJson(res, ItinerarySuccessResponseSchema, {
+        ...cachedPayload,
+        meta: {
+          ...cachedPayload.meta,
+          cached: true,
+        },
+      });
+      return;
+    }
+  }
+
+  const ctx = await prepareItineraryContext(config);
+
+  const timestamps = await collectContentTimestamps(
+    ctx.notion,
+    ctx.linkedNodes,
+    ctx.pageById,
+  );
+  const etag = fingerprintToEtag(buildFingerprint(timestamps));
+  touchItineraryFingerprintCheck(cacheSlug);
+
+  if (!forceRefresh) {
+    const cachedPayload = getItineraryCache(cacheSlug, etag);
+    if (cachedPayload) {
+      setItineraryResponseHeaders(res, etag, config.cacheMaxAge);
+      if (ifNoneMatch === etag) {
+        res.status(304).end();
+        return;
+      }
+
+      sendJson(res, ItinerarySuccessResponseSchema, {
+        ...cachedPayload,
+        meta: {
+          ...cachedPayload.meta,
+          cached: true,
+        },
+      });
+      return;
+    }
+  }
+
+  const payload = await buildItineraryPayload(ctx);
+  setItineraryCache(cacheSlug, etag, payload);
+  setItineraryResponseHeaders(res, etag, config.cacheMaxAge);
+
+  if (!forceRefresh && ifNoneMatch === etag) {
+    res.status(304).end();
+    return;
+  }
+
+  sendJson(res, ItinerarySuccessResponseSchema, payload);
+}
+
 export async function handleItinerary(req: Request, res: Response) {
   try {
-    const env = getEnv();
-    const forceRefresh = req.query.refresh === "1";
-    const maxAge = Number(env.ITINERARY_CACHE_MAX_AGE ?? "86400");
-    const fingerprintTtlMs = Number(env.ITINERARY_FINGERPRINT_TTL ?? "3600") * 1000;
-    const ifNoneMatch = parseIfNoneMatch(req.header("if-none-match"));
+    const config = buildRunConfigFromEnv();
+    await handleItineraryWithConfig(req, res, config, LEGACY_CACHE_SLUG);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    res.setHeader("Cache-Control", "no-store");
+    sendJson(res.status(500), ApiErrorSchema, { ok: false, error: message });
+  }
+}
 
-    if (!forceRefresh && canReuseFingerprint(fingerprintTtlMs)) {
-      const etag = getCurrentItineraryEtag();
-      const cachedPayload = etag ? getItineraryCache(etag) : null;
-      if (etag && cachedPayload) {
-        setItineraryResponseHeaders(res, etag, maxAge);
-        if (ifNoneMatch === etag) {
-          res.status(304).end();
-          return;
-        }
-
-        sendJson(res, ItinerarySuccessResponseSchema, {
-          ...cachedPayload,
-          meta: {
-            ...cachedPayload.meta,
-            cached: true,
-          },
-        });
-        return;
-      }
-    }
-
-    const ctx = await prepareItineraryContext(env);
-
-    const timestamps = await collectContentTimestamps(
-      ctx.notion,
-      ctx.linkedNodes,
-      ctx.pageById,
-    );
-    const etag = fingerprintToEtag(buildFingerprint(timestamps));
-    touchItineraryFingerprintCheck();
-
-    if (!forceRefresh) {
-      const cachedPayload = getItineraryCache(etag);
-      if (cachedPayload) {
-        setItineraryResponseHeaders(res, etag, maxAge);
-        if (ifNoneMatch === etag) {
-          res.status(304).end();
-          return;
-        }
-
-        sendJson(res, ItinerarySuccessResponseSchema, {
-          ...cachedPayload,
-          meta: {
-            ...cachedPayload.meta,
-            cached: true,
-          },
-        });
-        return;
-      }
-    }
-
-    const payload = await buildItineraryPayload(ctx);
-    setItineraryCache(etag, payload);
-    setItineraryResponseHeaders(res, etag, maxAge);
-
-    if (!forceRefresh && ifNoneMatch === etag) {
-      res.status(304).end();
+export async function handleTripItinerary(req: Request, res: Response) {
+  try {
+    const slug = String(req.params.slug ?? "").trim();
+    if (!slug) {
+      sendJson(res.status(400), ApiErrorSchema, { ok: false, error: "缺少旅行 slug" });
       return;
     }
 
-    sendJson(res, ItinerarySuccessResponseSchema, payload);
+    const trip = await resolveTripConfig(slug);
+    if (!trip) {
+      sendJson(res.status(404), ApiErrorSchema, { ok: false, error: "找不到此旅行" });
+      return;
+    }
+
+    const config = buildRunConfigFromTrip(trip);
+    await handleItineraryWithConfig(req, res, config, slug);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     res.setHeader("Cache-Control", "no-store");

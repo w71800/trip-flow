@@ -5,20 +5,24 @@ import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { TicketIcon } from "../components/Nav/NavIcons";
 import { parseApiResponse } from "../lib/parseApiResponse";
+import { useTrip } from "../trip/TripContext";
 
 const ticketEmptyIcon = <TicketIcon className="emptyStateIcon" />;
 
 export function TicketPage() {
   const { session } = useAuth();
+  const { slug, trip, error: tripError, isLoading: tripLoading } = useTrip();
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!slug || tripError) return;
+
     let cancelled = false;
 
     (async () => {
       try {
-        const res = await apiFetch("/api/ticket");
+        const res = await apiFetch(`/api/trips/${encodeURIComponent(slug)}/ticket`);
         const data = await parseApiResponse(res, TicketResponseSchema);
         if (!res.ok || !data.ok) {
           throw new Error("failed");
@@ -36,9 +40,10 @@ export function TicketPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [slug, tripError]);
 
-  const emptyMessage = error ?? message ?? "載入中…";
+  const emptyMessage =
+    tripError ?? error ?? message ?? (tripLoading ? "載入中…" : "載入中…");
 
   return (
     <main className="page">
@@ -48,6 +53,7 @@ export function TicketPage() {
           {session?.user.displayName
             ? `${session.user.displayName} 的票券資訊`
             : "個人票券資訊"}
+          {trip?.displayName ? ` · ${trip.displayName}` : ""}
         </p>
       </header>
 

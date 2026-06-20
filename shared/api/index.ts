@@ -44,6 +44,22 @@ export {
 } from "./itinerary.js";
 
 export {
+  TripStatusSchema,
+  TripSummarySchema,
+  TripDetailSchema,
+  TripsListSuccessResponseSchema,
+  TripsListResponseSchema,
+  TripDetailSuccessResponseSchema,
+  TripDetailResponseSchema,
+  type TripSummary,
+  type TripDetail,
+  type TripsListSuccessResponse,
+  type TripsListResponse,
+  type TripDetailSuccessResponse,
+  type TripDetailResponse,
+} from "./trips.js";
+
+export {
   PageKeySchema,
   PageMetaSchema,
   PageSuccessResponseSchema,

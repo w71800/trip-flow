@@ -91,10 +91,39 @@ export async function handleTicket(req: Request, res: Response) {
   });
 }
 
+import { resolveTripConfig } from "../trips/resolveTripConfig.js";
+
+export async function handleTripTicket(req: Request, res: Response) {
+  try {
+    const slug = String(req.params.slug ?? "").trim();
+    if (!slug) {
+      sendJson(res.status(400), ApiErrorSchema, { ok: false, error: "缺少旅行 slug" });
+      return;
+    }
+
+    const trip = await resolveTripConfig(slug);
+    if (!trip) {
+      sendJson(res.status(404), ApiErrorSchema, { ok: false, error: "找不到此旅行" });
+      return;
+    }
+
+    const user = (req as AuthedRequest).user;
+    sendJson(res, TicketSuccessResponseSchema, {
+      ok: true,
+      message: `票券功能開發中（${trip.displayName}）`,
+      user,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    sendJson(res.status(500), ApiErrorSchema, { ok: false, error: message });
+  }
+}
+
 export const authRouteHandlers = {
   login: handleLogin,
   refresh: handleRefresh,
   logout: handleLogout,
   me: [requireAuth, handleMe] as const,
   ticket: [requireAuth, handleTicket] as const,
+  tripTicket: [requireAuth, handleTripTicket] as const,
 };

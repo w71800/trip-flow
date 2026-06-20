@@ -5,11 +5,15 @@ import {
 
 export type { StoredItineraryCache };
 
-const CACHE_KEY = "trip-flow:itinerary:v1";
+const CACHE_KEY_PREFIX = "trip-flow:itinerary:v2:";
 
-export function loadItineraryCache(): StoredItineraryCache | null {
+function cacheKey(slug: string) {
+  return `${CACHE_KEY_PREFIX}${slug}`;
+}
+
+export function loadItineraryCache(slug: string): StoredItineraryCache | null {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(cacheKey(slug));
     if (!raw) return null;
     const parsed = StoredItineraryCacheSchema.safeParse(JSON.parse(raw));
     if (!parsed.success) return null;
@@ -19,10 +23,10 @@ export function loadItineraryCache(): StoredItineraryCache | null {
   }
 }
 
-export function saveItineraryCache(data: StoredItineraryCache) {
+export function saveItineraryCache(slug: string, data: StoredItineraryCache) {
   try {
     const parsed = StoredItineraryCacheSchema.parse(data);
-    localStorage.setItem(CACHE_KEY, JSON.stringify(parsed));
+    localStorage.setItem(cacheKey(slug), JSON.stringify(parsed));
   } catch {
     // 資料不符合契約或 localStorage 失敗時忽略即可。
   }

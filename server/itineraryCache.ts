@@ -9,7 +9,11 @@ type ItineraryCacheEntry = {
   fingerprintCheckedAt: number;
 };
 
-let cache: ItineraryCacheEntry | null = null;
+const caches = new Map<string, ItineraryCacheEntry>();
+
+function getEntry(slug: string): ItineraryCacheEntry | null {
+  return caches.get(slug) ?? null;
+}
 
 export function fingerprintToEtag(fingerprint: string): string {
   const hash = createHash("sha256").update(fingerprint).digest("hex").slice(0, 16);
@@ -25,33 +29,44 @@ export function buildFingerprint(
     .join("\n");
 }
 
-export function getItineraryCache(etag: string): ItineraryCachePayload | null {
+export function getItineraryCache(slug: string, etag: string): ItineraryCachePayload | null {
+  const cache = getEntry(slug);
   if (!cache || cache.etag !== etag) return null;
   return cache.payload;
 }
 
-export function setItineraryCache(etag: string, payload: ItineraryCachePayload) {
-  cache = {
+export function setItineraryCache(
+  slug: string,
+  etag: string,
+  payload: ItineraryCachePayload,
+) {
+  caches.set(slug, {
     etag,
     payload,
     fingerprintCheckedAt: Date.now(),
-  };
+  });
 }
 
-export function touchItineraryFingerprintCheck() {
+export function touchItineraryFingerprintCheck(slug: string) {
+  const cache = getEntry(slug);
   if (!cache) return;
   cache.fingerprintCheckedAt = Date.now();
 }
 
-export function canReuseFingerprint(ttlMs: number): boolean {
+export function canReuseFingerprint(slug: string, ttlMs: number): boolean {
+  const cache = getEntry(slug);
   if (!cache || ttlMs <= 0) return false;
   return Date.now() - cache.fingerprintCheckedAt < ttlMs;
 }
 
-export function clearItineraryCache() {
-  cache = null;
+export function clearItineraryCache(slug?: string) {
+  if (slug) {
+    caches.delete(slug);
+    return;
+  }
+  caches.clear();
 }
 
-export function getCurrentItineraryEtag(): string | null {
-  return cache?.etag ?? null;
+export function getCurrentItineraryEtag(slug: string): string | null {
+  return getEntry(slug)?.etag ?? null;
 }

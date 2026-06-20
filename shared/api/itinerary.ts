@@ -18,6 +18,8 @@ export const ItineraryMetaSchema = z.object({
   fetchedAt: z.string(),
   tripStart: z.string(),
   tripEnd: z.string(),
+  tripSlug: z.string().optional(),
+  tripDisplayName: z.string().optional(),
   cached: z.boolean().optional(),
 });
 

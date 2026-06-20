@@ -8,6 +8,7 @@ import { CacheStatus } from "../lib/cacheStatus";
 import { loadItineraryCache, saveItineraryCache } from "../lib/itineraryCache";
 import { parseApiResponse } from "../lib/parseApiResponse";
 import { formatTripDate, generateDateRange } from "../lib/tripDates";
+import { useTrip } from "../trip/TripContext";
 import "./ItineraryPage.css";
 
 const DEFAULT_TRIP_START = "2026-07-16";
@@ -55,6 +56,7 @@ function prefersReducedMotion() {
 }
 
 export function ItineraryPage() {
+  const { slug, trip, isLoading: tripLoading, error: tripError } = useTrip();
   const [items, setItems] = useState<ItineraryItem[]>([]);
   const [tripStart, setTripStart] = useState(DEFAULT_TRIP_START);
   const [tripEnd, setTripEnd] = useState(DEFAULT_TRIP_END);
@@ -71,9 +73,9 @@ export function ItineraryPage() {
   const apiUrl = useMemo(
     () =>
       forceRefresh
-        ? `/api/itinerary?refresh=1&_=${refreshNonce}`
-        : `/api/itinerary`,
-    [refreshNonce, forceRefresh],
+        ? `/api/trips/${encodeURIComponent(slug)}/itinerary?refresh=1&_=${refreshNonce}`
+        : `/api/trips/${encodeURIComponent(slug)}/itinerary`,
+    [slug, refreshNonce, forceRefresh],
   );
 
   const tripDates = useMemo(
@@ -129,12 +131,14 @@ export function ItineraryPage() {
   }, [tripDates, counts, undated]);
 
   useEffect(() => {
+    if (!slug || tripError) return;
+
     let cancelled = false;
     const controller = new AbortController();
 
     function applyItinerary(nextItems: ItineraryItem[], meta?: Partial<ItineraryMeta>) {
-      const start = meta?.tripStart ?? DEFAULT_TRIP_START;
-      const end = meta?.tripEnd ?? DEFAULT_TRIP_END;
+      const start = meta?.tripStart ?? trip?.tripStart ?? DEFAULT_TRIP_START;
+      const end = meta?.tripEnd ?? trip?.tripEnd ?? DEFAULT_TRIP_END;
       const dates = generateDateRange(start, end);
       const { counts: nextCounts, undated: nextUndated } = countItemsByDate(
         nextItems,
@@ -152,7 +156,7 @@ export function ItineraryPage() {
     }
 
     async function run() {
-      const localCache = forceRefresh ? null : loadItineraryCache();
+      const localCache = forceRefresh ? null : loadItineraryCache(slug);
       const hasLocalCache = !!localCache;
 
       if (hasLocalCache) {
@@ -197,7 +201,7 @@ export function ItineraryPage() {
 
         const etag = res.headers.get("ETag");
         if (etag) {
-          saveItineraryCache({
+          saveItineraryCache(slug, {
             etag,
             items: json.items,
             meta: json.meta,
@@ -225,7 +229,7 @@ export function ItineraryPage() {
       cancelled = true;
       controller.abort();
     };
-  }, [apiUrl, forceRefresh]);
+  }, [apiUrl, forceRefresh, slug, trip?.tripEnd, trip?.tripStart, tripError]);
 
   function handleRefresh() {
     setCacheStatus(CacheStatus.Loading);
@@ -247,18 +251,25 @@ export function ItineraryPage() {
         <h1 className="title">行程時間軸</h1>
       </div>
 
-      {loading && <div className="status">載入中...</div>}
-      {error && (
+      {tripLoading && <div className="status">載入旅行資訊…</div>}
+      {tripError && (
+        <div className="status" role="alert">
+          {tripError}
+        </div>
+      )}
+
+      {!tripLoading && !tripError && loading && <div className="status">載入中...</div>}
+      {!tripLoading && !tripError && error && (
         <div className="status" role="alert">
           {error}
         </div>
       )}
 
-      {!loading && !error && items.length === 0 && (
+      {!tripLoading && !tripError && !loading && !error && items.length === 0 && (
         <div className="status">目前沒有可呈現的行程（可能皆未設定連結）。</div>
       )}
 
-      {!loading && !error && items.length > 0 && (
+      {!tripLoading && !tripError && !loading && !error && items.length > 0 && (
         <>
           <div className="datePicker">
             <label
