@@ -6,6 +6,31 @@ export {
 export { formatZodError, parseApiPayload } from "./parsePayload.js";
 
 export {
+  AuthUserSchema,
+  AuthSessionSchema,
+  LoginBodySchema,
+  RefreshBodySchema,
+  LoginSuccessResponseSchema,
+  LoginResponseSchema,
+  RefreshSuccessResponseSchema,
+  RefreshResponseSchema,
+  MeSuccessResponseSchema,
+  MeResponseSchema,
+  TicketSuccessResponseSchema,
+  TicketResponseSchema,
+  type AuthUser,
+  type AuthSession,
+  type LoginSuccessResponse,
+  type LoginResponse,
+  type RefreshSuccessResponse,
+  type RefreshResponse,
+  type MeSuccessResponse,
+  type MeResponse,
+  type TicketSuccessResponse,
+  type TicketResponse,
+} from "./auth.js";
+
+export {
   ItineraryItemSchema,
   ItineraryMetaSchema,
   ItinerarySuccessResponseSchema,

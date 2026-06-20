@@ -1,14 +1,4 @@
-export type AuthUser = {
-  id: string;
-  displayName: string;
-};
-
-export type AuthSession = {
-  user: AuthUser;
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: string;
-};
+export type { AuthUser, AuthSession } from "@shared/api/auth.js";
 
 export type AccessTokenPayload = {
   sub: string;

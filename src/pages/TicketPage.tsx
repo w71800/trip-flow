@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
+import { TicketResponseSchema } from "@shared/api/auth";
 import { apiFetch } from "../auth/apiFetch";
 import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { TicketIcon } from "../components/Nav/NavIcons";
-
-type TicketResponse =
-  | { ok: true; message: string; user: { id: string; displayName: string } }
-  | { ok: false; error: string };
+import { parseApiResponse } from "../lib/parseApiResponse";
 
 const ticketEmptyIcon = <TicketIcon className="emptyStateIcon" />;
 
@@ -21,7 +19,7 @@ export function TicketPage() {
     (async () => {
       try {
         const res = await apiFetch("/api/ticket");
-        const data = (await res.json()) as TicketResponse;
+        const data = await parseApiResponse(res, TicketResponseSchema);
         if (!res.ok || !data.ok) {
           throw new Error("failed");
         }

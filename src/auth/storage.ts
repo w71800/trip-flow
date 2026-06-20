@@ -1,4 +1,4 @@
-import type { AuthSession } from "./types";
+import { AuthSessionSchema, type AuthSession } from "@shared/api/auth";
 
 const STORAGE_KEY = "trip_flow_session";
 
@@ -6,23 +6,16 @@ export function loadSession(): AuthSession | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as AuthSession;
-    if (
-      !parsed?.accessToken ||
-      !parsed?.refreshToken ||
-      !parsed?.expiresAt ||
-      !parsed?.user?.id
-    ) {
-      return null;
-    }
-    return parsed;
+    const parsed = AuthSessionSchema.safeParse(JSON.parse(raw));
+    if (!parsed.success) return null;
+    return parsed.data;
   } catch {
     return null;
   }
 }
 
 export function saveSession(session: AuthSession) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(AuthSessionSchema.parse(session)));
 }
 
 export function clearSession() {

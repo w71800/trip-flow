@@ -4,16 +4,13 @@ import {
   loadSession,
   saveSession,
 } from "./storage";
-import type {
-  AuthSession,
-  LoginResponse,
-  MeResponse,
-  RefreshResponse,
-} from "./types";
-
-async function parseJson<T>(res: Response): Promise<T> {
-  return (await res.json()) as T;
-}
+import {
+  LoginResponseSchema,
+  MeResponseSchema,
+  RefreshResponseSchema,
+  type AuthSession,
+} from "@shared/api/auth";
+import { parseApiResponse } from "../lib/parseApiResponse";
 
 export async function login(id: string, password: string): Promise<AuthSession> {
   const res = await fetch("/api/auth/login", {
@@ -22,7 +19,7 @@ export async function login(id: string, password: string): Promise<AuthSession> 
     body: JSON.stringify({ id, password }),
   });
 
-  const data = await parseJson<LoginResponse>(res);
+  const data = await parseApiResponse(res, LoginResponseSchema);
   if (!res.ok || !data.ok) {
     throw new Error("invalid_credentials");
   }
@@ -46,7 +43,7 @@ export async function refreshSession(
     body: JSON.stringify({ refreshToken: session.refreshToken }),
   });
 
-  const data = await parseJson<RefreshResponse>(res);
+  const data = await parseApiResponse(res, RefreshResponseSchema);
   if (!res.ok || !data.ok) {
     throw new Error("refresh_failed");
   }
@@ -66,7 +63,7 @@ export async function fetchMe(accessToken: string) {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
-  const data = await parseJson<MeResponse>(res);
+  const data = await parseApiResponse(res, MeResponseSchema);
   if (!res.ok || !data.ok) {
     throw new Error("unauthorized");
   }
