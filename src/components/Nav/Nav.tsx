@@ -9,6 +9,7 @@ import {
   MenuIcon,
   TicketIcon,
   TimelineIcon,
+  TripsIcon,
 } from "./NavIcons";
 import { tokens } from "../../styles/tokens";
 import "./Nav.css";
@@ -19,6 +20,7 @@ const overviewNavItems = [
 
 function buildTripNavItems(tripSlug: string) {
   return [
+    { to: "/", label: "所有旅行", end: true, Icon: TripsIcon },
     { to: `/${tripSlug}`, label: "行程時間軸", end: true, Icon: TimelineIcon },
     { to: `/${tripSlug}/flight`, label: "飛機資訊", end: false, Icon: FlightIcon },
     {
@@ -175,12 +177,6 @@ export function Nav() {
             <NavLink to={brandTo} className="navBrand" end>
               {brandLabel}
             </NavLink>
-
-            {tripContext?.slug ? (
-              <Link to="/" className="navBackToOverview">
-                所有旅行
-              </Link>
-            ) : null}
           </div>
 
           <div className="navRight">
