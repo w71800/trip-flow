@@ -32,7 +32,15 @@ export const ItineraryResponseSchema = z.discriminatedUnion("ok", [
   ApiErrorSchema,
 ]);
 
+export const StoredItineraryCacheSchema = z.object({
+  etag: z.string().min(1),
+  items: z.array(ItineraryItemSchema),
+  meta: ItineraryMetaSchema.partial(),
+  savedAt: z.string(),
+});
+
 export type ItineraryItem = z.infer<typeof ItineraryItemSchema>;
 export type ItineraryMeta = z.infer<typeof ItineraryMetaSchema>;
 export type ItinerarySuccessResponse = z.infer<typeof ItinerarySuccessResponseSchema>;
 export type ItineraryResponse = z.infer<typeof ItineraryResponseSchema>;
+export type StoredItineraryCache = z.infer<typeof StoredItineraryCacheSchema>;

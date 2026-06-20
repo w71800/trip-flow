@@ -1,6 +1,11 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import type { ItineraryItem, ItinerarySuccessResponse } from "@shared/api/itinerary.js";
+import { ApiErrorSchema } from "@shared/api/common.js";
+import {
+  ItinerarySuccessResponseSchema,
+  type ItineraryItem,
+  type ItinerarySuccessResponse,
+} from "@shared/api/itinerary.js";
 import {
   buildFingerprint,
   canReuseFingerprint,
@@ -14,6 +19,7 @@ import {
 import { getNotionClient } from "./notion.js";
 import { blocksToHtml } from "./notionBlocksToHtml.js";
 import { propertiesToHtml } from "./notionPropertiesToHtml.js";
+import { sendJson } from "./sendJson.js";
 
 const EnvSchema = z.object({
   NOTION_TOKEN: z.string().min(1),
@@ -426,7 +432,7 @@ async function buildItineraryPayload(ctx: ItineraryContext): Promise<ItinerarySu
   const tripStart = ctx.env.TRIP_START_DATE ?? "2026-07-16";
   const tripEnd = ctx.env.TRIP_END_DATE ?? "2026-07-23";
 
-  return {
+  return ItinerarySuccessResponseSchema.parse({
     ok: true,
     items,
     meta: {
@@ -435,7 +441,7 @@ async function buildItineraryPayload(ctx: ItineraryContext): Promise<ItinerarySu
       tripEnd,
       cached: false,
     },
-  };
+  });
 }
 
 export async function handleItinerary(req: Request, res: Response) {
@@ -456,7 +462,7 @@ export async function handleItinerary(req: Request, res: Response) {
           return;
         }
 
-        res.json({
+        sendJson(res, ItinerarySuccessResponseSchema, {
           ...cachedPayload,
           meta: {
             ...cachedPayload.meta,
@@ -486,7 +492,7 @@ export async function handleItinerary(req: Request, res: Response) {
           return;
         }
 
-        res.json({
+        sendJson(res, ItinerarySuccessResponseSchema, {
           ...cachedPayload,
           meta: {
             ...cachedPayload.meta,
@@ -506,10 +512,10 @@ export async function handleItinerary(req: Request, res: Response) {
       return;
     }
 
-    res.json(payload);
+    sendJson(res, ItinerarySuccessResponseSchema, payload);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     res.setHeader("Cache-Control", "no-store");
-    res.status(500).json({ ok: false, error: message });
+    sendJson(res.status(500), ApiErrorSchema, { ok: false, error: message });
   }
 }

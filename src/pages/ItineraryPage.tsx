@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ItineraryItem, ItineraryMeta, ItineraryResponse } from "@shared/api/itinerary";
+import { ItineraryResponseSchema, type ItineraryItem, type ItineraryMeta } from "@shared/api/itinerary";
 import { EmptyDayState } from "../components/EmptyDayState";
 import { RefreshStatusButton } from "../components/RefreshStatusButton";
 import { Select } from "../components/Select";
 import { TripCard } from "../components/TripCard";
 import { CacheStatus } from "../lib/cacheStatus";
 import { loadItineraryCache, saveItineraryCache } from "../lib/itineraryCache";
+import { parseApiResponse } from "../lib/parseApiResponse";
 import { formatTripDate, generateDateRange } from "../lib/tripDates";
 import "./ItineraryPage.css";
 
@@ -183,7 +184,7 @@ export function ItineraryPage() {
           return;
         }
 
-        const json = (await res.json()) as ItineraryResponse;
+        const json = await parseApiResponse(res, ItineraryResponseSchema);
         if (!json.ok) {
           if (!hasLocalCache) {
             setError(json.error);
@@ -199,13 +200,13 @@ export function ItineraryPage() {
           saveItineraryCache({
             etag,
             items: json.items,
-            meta: json.meta ?? {},
+            meta: json.meta,
             savedAt: new Date().toISOString(),
           });
         }
 
         setCacheStatus(
-          json.meta?.cached ? CacheStatus.ServerCached : CacheStatus.Updated,
+          json.meta.cached ? CacheStatus.ServerCached : CacheStatus.Updated,
         );
       } catch (e) {
         if (cancelled) return;

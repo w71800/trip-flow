@@ -1,13 +1,16 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
+import { ApiErrorSchema } from "@shared/api/common.js";
 import {
   PageKeySchema,
+  PageSuccessResponseSchema,
   type PageKey,
   type PageSuccessResponse,
 } from "@shared/api/pages.js";
 import { reloadEnv } from "./env.js";
 import { getNotionClient } from "./notion.js";
 import { fetchPageMeta, pageBlocksToHtml } from "./notionPageBlocks.js";
+import { sendJson } from "./sendJson.js";
 
 const EnvSchema = z.object({
   NOTION_TOKEN: z.string().min(1),
@@ -83,7 +86,7 @@ async function buildPagePayload(
   const meta = await fetchPageMeta(notion, pageId);
   const { html } = await pageBlocksToHtml(notion, pageId, { maxBlocks });
 
-  return {
+  return PageSuccessResponseSchema.parse({
     ok: true,
     key,
     title: meta.title,
@@ -94,7 +97,7 @@ async function buildPagePayload(
       lastEditedTime: meta.lastEditedTime,
       cached: false,
     },
-  };
+  });
 }
 
 export async function handleNotionPage(req: Request, res: Response) {
@@ -102,7 +105,7 @@ export async function handleNotionPage(req: Request, res: Response) {
     const env = getEnv();
     const keyResult = PageKeySchema.safeParse(req.params.key);
     if (!keyResult.success) {
-      res.status(400).json({ ok: false, error: "無效的頁面 key" });
+      sendJson(res.status(400), ApiErrorSchema, { ok: false, error: "無效的頁面 key" });
       return;
     }
     const key = keyResult.data;
@@ -122,7 +125,7 @@ export async function handleNotionPage(req: Request, res: Response) {
           res.status(304).end();
           return;
         }
-        res.json({
+        sendJson(res, PageSuccessResponseSchema, {
           ...cached.payload,
           meta: { ...cached.payload.meta, cached: true },
         });
@@ -142,10 +145,10 @@ export async function handleNotionPage(req: Request, res: Response) {
       return;
     }
 
-    res.json(payload);
+    sendJson(res, PageSuccessResponseSchema, payload);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     res.setHeader("Cache-Control", "no-store");
-    res.status(500).json({ ok: false, error: message });
+    sendJson(res.status(500), ApiErrorSchema, { ok: false, error: message });
   }
 }

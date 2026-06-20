@@ -1,11 +1,9 @@
-import type { ItineraryItem, ItineraryMeta } from "@shared/api/itinerary";
+import {
+  StoredItineraryCacheSchema,
+  type StoredItineraryCache,
+} from "@shared/api/itinerary";
 
-export type StoredItineraryCache = {
-  etag: string;
-  items: ItineraryItem[];
-  meta: Partial<ItineraryMeta>;
-  savedAt: string;
-};
+export type { StoredItineraryCache };
 
 const CACHE_KEY = "trip-flow:itinerary:v1";
 
@@ -13,9 +11,9 @@ export function loadItineraryCache(): StoredItineraryCache | null {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredItineraryCache;
-    if (!parsed?.etag || !Array.isArray(parsed.items)) return null;
-    return parsed;
+    const parsed = StoredItineraryCacheSchema.safeParse(JSON.parse(raw));
+    if (!parsed.success) return null;
+    return parsed.data;
   } catch {
     return null;
   }
@@ -23,8 +21,9 @@ export function loadItineraryCache(): StoredItineraryCache | null {
 
 export function saveItineraryCache(data: StoredItineraryCache) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    const parsed = StoredItineraryCacheSchema.parse(data);
+    localStorage.setItem(CACHE_KEY, JSON.stringify(parsed));
   } catch {
-    // localStorage 可能因容量或隱私模式失敗，忽略即可。
+    // 資料不符合契約或 localStorage 失敗時忽略即可。
   }
 }

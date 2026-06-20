@@ -1,7 +1,8 @@
-import type { PageKey, PageResponse } from "@shared/api/pages";
+import { PageResponseSchema, type PageKey } from "@shared/api/pages";
 import { useEffect, useMemo, useState } from "react";
 import { RefreshStatusButton } from "../RefreshStatusButton";
 import { CacheStatus } from "../../lib/cacheStatus";
+import { parseApiResponse } from "../../lib/parseApiResponse";
 import "./NotionPage.css";
 
 type NotionPageViewProps = {
@@ -49,7 +50,7 @@ export function NotionPageView({ pageKey }: NotionPageViewProps) {
           return;
         }
 
-        const json = (await res.json()) as PageResponse;
+        const json = await parseApiResponse(res, PageResponseSchema);
         if (!json.ok) {
           setError(json.error);
           setHtml("");
@@ -60,7 +61,7 @@ export function NotionPageView({ pageKey }: NotionPageViewProps) {
         setIcon(json.icon);
         setHtml(json.html);
         setCacheStatus(
-          json.meta?.cached ? CacheStatus.ServerCached : CacheStatus.Updated,
+          json.meta.cached ? CacheStatus.ServerCached : CacheStatus.Updated,
         );
       } catch (e) {
         if (cancelled) return;
