@@ -6,7 +6,7 @@ import express from "express";
 import cors from "cors";
 import { watchEnvInDev } from "./env.js";
 import { authRouteHandlers } from "./auth/routes.js";
-import { handleItinerary, handleTripItinerary } from "./itinerary.js";
+import { handleItinerary, handleTripItinerary, handleItineraryItemContent, handleTripItineraryItemContent } from "./itinerary.js";
 import { handleNotionPage, handleTripNotionPage } from "./notionPage.js";
 import { handleTripDetail, handleTripsList } from "./trips/handlers.js";
 import { requireAuth } from "./auth/middleware.js";
@@ -30,9 +30,11 @@ app.get("/api/health", (_req, res) => {
 
 app.get("/api/trips", requireAuth, handleTripsList);
 app.get("/api/trips/:slug", handleTripDetail);
+app.get("/api/trips/:slug/itinerary/:flowId/content", handleTripItineraryItemContent);
 app.get("/api/trips/:slug/itinerary", handleTripItinerary);
 app.get("/api/trips/:slug/pages/:key", handleTripNotionPage);
 
+app.get("/api/itinerary/:flowId/content", handleItineraryItemContent);
 app.get("/api/itinerary", handleItinerary);
 app.get("/api/pages/:key", handleNotionPage);
 

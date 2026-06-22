@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import { ApiErrorSchema } from "@shared/api/common.js";
 import {
+  ItineraryItemContentSuccessResponseSchema,
   ItinerarySuccessResponseSchema,
   type ItineraryItem,
   type ItinerarySuccessResponse,
@@ -452,6 +453,156 @@ async function prepareItineraryContext(config: ItineraryRunConfig): Promise<Itin
   };
 }
 
+type FlowPropertyNames = {
+  titlePropertyName: string;
+  nextPropertyName: string;
+  prevPropertyName: string;
+  detailsPropertyName: string | null;
+  datePropertyName: string | null;
+};
+
+function getFlowSkipProps(
+  names: FlowPropertyNames,
+): string[] {
+  const skipProps = [
+    names.titlePropertyName,
+    names.nextPropertyName,
+    names.prevPropertyName,
+  ];
+  if (names.detailsPropertyName) skipProps.push(names.detailsPropertyName);
+  if (names.datePropertyName) skipProps.push(names.datePropertyName);
+  return skipProps;
+}
+
+async function buildFlowItemHtml(
+  notion: ReturnType<typeof getNotionClient>,
+  config: ItineraryRunConfig,
+  node: { id: string; detailsId: string | null },
+  page: any | undefined,
+  names: FlowPropertyNames,
+  options: { maxBlocks: number },
+): Promise<{ html: string; hasMoreContent: boolean }> {
+  const contentPageId = node.detailsId ?? node.id;
+  const blocks = await getPageBlocks(notion, contentPageId, config.blocksMaxFetch);
+  const { html: blockHtml } = await blocksToHtml(blocks, {
+    maxBlocks: options.maxBlocks,
+  });
+  const blockHtmlTrim = blockHtml.trim();
+
+  const propHtml = page
+    ? propertiesToHtml(page.properties, { skip: getFlowSkipProps(names) })
+    : "";
+
+  const html = blockHtmlTrim || propHtml.trim() || "";
+  const hasMoreContent =
+    blockHtmlTrim.length > 0 && blocks.length > config.blocksMaxRender;
+
+  return { html, hasMoreContent };
+}
+
+async function resolveFlowPropertyNames(
+  config: ItineraryRunConfig,
+): Promise<FlowPropertyNames & { notion: ReturnType<typeof getNotionClient> }> {
+  const notion = getNotionClient();
+  const { dataSource } = await resolveDataSource(notion, config.flowDatabaseId);
+
+  const titlePropertyName = pickTitlePropertyName(dataSource, config.flowTitleProperty);
+  const nextPropertyName = pickRelationPropertyName(
+    dataSource,
+    config.flowNextProperty,
+    "next",
+  );
+  const prevPropertyName = pickRelationPropertyName(
+    dataSource,
+    config.flowPreviousProperty,
+    "previous",
+  );
+  const detailsPropertyName = pickRelationPropertyName(
+    dataSource,
+    config.flowDetailsProperty,
+    "details",
+  );
+  const datePropertyName = pickDatePropertyName(dataSource, config.flowDateProperty);
+
+  if (!nextPropertyName || !prevPropertyName) {
+    throw new Error(
+      "找不到 next/previous 關聯欄位；請設定 NOTION_FLOW_NEXT_PROPERTY 與 NOTION_FLOW_PREVIOUS_PROPERTY。",
+    );
+  }
+
+  return {
+    notion,
+    titlePropertyName,
+    nextPropertyName,
+    prevPropertyName,
+    detailsPropertyName,
+    datePropertyName,
+  };
+}
+
+async function buildItineraryItemFullHtml(
+  config: ItineraryRunConfig,
+  flowId: string,
+): Promise<string | null> {
+  const names = await resolveFlowPropertyNames(config);
+
+  let page: any;
+  try {
+    page = await names.notion.pages.retrieve({ page_id: flowId });
+  } catch {
+    return null;
+  }
+
+  const nextIds = getRelationIds(page.properties?.[names.nextPropertyName]);
+  const prevIds = getRelationIds(page.properties?.[names.prevPropertyName]);
+  if (!nextIds[0] && !prevIds[0]) return null;
+
+  const detailsIds = names.detailsPropertyName
+    ? getRelationIds(page.properties?.[names.detailsPropertyName])
+    : [];
+
+  const node = {
+    id: flowId,
+    detailsId: detailsIds[0] ?? null,
+  };
+
+  const { html } = await buildFlowItemHtml(
+    names.notion,
+    config,
+    node,
+    page,
+    names,
+    { maxBlocks: config.blocksMaxFetch },
+  );
+
+  return html || null;
+}
+
+async function handleItineraryItemContentWithConfig(
+  req: Request,
+  res: Response,
+  config: ItineraryRunConfig,
+) {
+  const flowId = String(req.params.flowId ?? "").trim();
+  if (!flowId) {
+    sendJson(res.status(400), ApiErrorSchema, { ok: false, error: "缺少行程 flowId" });
+    return;
+  }
+
+  const html = await buildItineraryItemFullHtml(config, flowId);
+  if (html === null) {
+    sendJson(res.status(404), ApiErrorSchema, { ok: false, error: "找不到此行程" });
+    return;
+  }
+
+  res.setHeader("Cache-Control", `private, max-age=${config.cacheMaxAge}`);
+  sendJson(res, ItineraryItemContentSuccessResponseSchema, {
+    ok: true,
+    flowId,
+    html,
+  });
+}
+
 async function buildItineraryPayload(ctx: ItineraryContext): Promise<ItinerarySuccessResponse> {
   const orderedIds = buildOrder(ctx.linkedNodes);
 
@@ -464,29 +615,27 @@ async function buildItineraryPayload(ctx: ItineraryContext): Promise<ItinerarySu
     if (!node) continue;
 
     const page = ctx.pageById.get(id);
-    const contentPageId = node.detailsId ?? node.id;
-    const blocks = await getPageBlocks(ctx.notion, contentPageId, ctx.config.blocksMaxFetch);
-    const { html: blockHtml } = await blocksToHtml(blocks, {
-      maxBlocks: ctx.config.blocksMaxRender,
-    });
-    const blockHtmlTrim = blockHtml.trim();
-
-    const skipProps = [
-      ctx.titlePropertyName,
-      ctx.nextPropertyName,
-      ctx.prevPropertyName,
-    ];
-    if (ctx.detailsPropertyName) skipProps.push(ctx.detailsPropertyName);
-    if (ctx.datePropertyName) skipProps.push(ctx.datePropertyName);
-    const propHtml = page ? propertiesToHtml(page.properties, { skip: skipProps }) : "";
-
-    const html = blockHtmlTrim || propHtml.trim() || "";
+    const { html, hasMoreContent } = await buildFlowItemHtml(
+      ctx.notion,
+      ctx.config,
+      node,
+      page,
+      {
+        titlePropertyName: ctx.titlePropertyName,
+        nextPropertyName: ctx.nextPropertyName,
+        prevPropertyName: ctx.prevPropertyName,
+        detailsPropertyName: ctx.detailsPropertyName,
+        datePropertyName: ctx.datePropertyName,
+      },
+      { maxBlocks: ctx.config.blocksMaxRender },
+    );
 
     items.push({
       flowId: node.id,
       order,
       title: node.title || `行程 ${order}`,
       html,
+      hasMoreContent,
       date: page ? getDateFromPage(page, ctx.datePropertyName) : null,
       nextFlowId: node.nextId,
       prevFlowId: node.prevId,
@@ -607,6 +756,40 @@ export async function handleTripItinerary(req: Request, res: Response) {
 
     const config = buildRunConfigFromTrip(trip);
     await handleItineraryWithConfig(req, res, config, slug);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    res.setHeader("Cache-Control", "no-store");
+    sendJson(res.status(500), ApiErrorSchema, { ok: false, error: message });
+  }
+}
+
+export async function handleItineraryItemContent(req: Request, res: Response) {
+  try {
+    const config = buildRunConfigFromEnv();
+    await handleItineraryItemContentWithConfig(req, res, config);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    res.setHeader("Cache-Control", "no-store");
+    sendJson(res.status(500), ApiErrorSchema, { ok: false, error: message });
+  }
+}
+
+export async function handleTripItineraryItemContent(req: Request, res: Response) {
+  try {
+    const slug = String(req.params.slug ?? "").trim();
+    if (!slug) {
+      sendJson(res.status(400), ApiErrorSchema, { ok: false, error: "缺少旅行 slug" });
+      return;
+    }
+
+    const trip = await resolveTripConfig(slug);
+    if (!trip) {
+      sendJson(res.status(404), ApiErrorSchema, { ok: false, error: "找不到此旅行" });
+      return;
+    }
+
+    const config = buildRunConfigFromTrip(trip);
+    await handleItineraryItemContentWithConfig(req, res, config);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     res.setHeader("Cache-Control", "no-store");

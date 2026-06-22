@@ -306,9 +306,11 @@ export function ItineraryPage() {
                   return (
                     <TripCard
                       key={it.flowId}
-                      order={it.order}
+                      tripSlug={slug}
+                      flowId={it.flowId}
                       title={it.title}
                       html={it.html}
+                      hasMoreContent={it.hasMoreContent}
                       isLast={index === displayedDayItems.length - 1}
                       isLinkedToNext={isLinkedToNext}
                     />

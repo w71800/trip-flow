@@ -35,11 +35,15 @@ export {
   ItineraryMetaSchema,
   ItinerarySuccessResponseSchema,
   ItineraryResponseSchema,
+  ItineraryItemContentSuccessResponseSchema,
+  ItineraryItemContentResponseSchema,
   StoredItineraryCacheSchema,
   type ItineraryItem,
   type ItineraryMeta,
   type ItinerarySuccessResponse,
   type ItineraryResponse,
+  type ItineraryItemContentSuccessResponse,
+  type ItineraryItemContentResponse,
   type StoredItineraryCache,
 } from "./itinerary.js";
 

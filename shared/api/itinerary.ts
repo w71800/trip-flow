@@ -6,6 +6,7 @@ export const ItineraryItemSchema = z.object({
   order: z.number().int().positive(),
   title: z.string(),
   html: z.string(),
+  hasMoreContent: z.boolean().default(false),
   date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -13,6 +14,17 @@ export const ItineraryItemSchema = z.object({
   nextFlowId: z.string().nullable(),
   prevFlowId: z.string().nullable(),
 });
+
+export const ItineraryItemContentSuccessResponseSchema = z.object({
+  ok: z.literal(true),
+  flowId: z.string(),
+  html: z.string(),
+});
+
+export const ItineraryItemContentResponseSchema = z.discriminatedUnion("ok", [
+  ItineraryItemContentSuccessResponseSchema,
+  ApiErrorSchema,
+]);
 
 export const ItineraryMetaSchema = z.object({
   fetchedAt: z.string(),
@@ -45,4 +57,8 @@ export type ItineraryItem = z.infer<typeof ItineraryItemSchema>;
 export type ItineraryMeta = z.infer<typeof ItineraryMetaSchema>;
 export type ItinerarySuccessResponse = z.infer<typeof ItinerarySuccessResponseSchema>;
 export type ItineraryResponse = z.infer<typeof ItineraryResponseSchema>;
+export type ItineraryItemContentSuccessResponse = z.infer<
+  typeof ItineraryItemContentSuccessResponseSchema
+>;
+export type ItineraryItemContentResponse = z.infer<typeof ItineraryItemContentResponseSchema>;
 export type StoredItineraryCache = z.infer<typeof StoredItineraryCacheSchema>;

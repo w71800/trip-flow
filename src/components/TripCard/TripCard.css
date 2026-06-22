@@ -119,3 +119,33 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
 }
+
+.contentToggle {
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.contentToggle:hover:not(:disabled) {
+  color: #1d4ed8;
+}
+
+.contentToggle:disabled {
+  color: var(--muted);
+  cursor: wait;
+  text-decoration: none;
+}
+
+.contentToggleError {
+  margin: 8px 0 0;
+  color: #b91c1c;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
