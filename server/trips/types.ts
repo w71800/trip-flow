@@ -7,6 +7,7 @@ export type TripConfig = {
   flowDatabaseId: string;
   flightPageId: string | null;
   accommodationPageId: string | null;
+  ticketPageId: string | null;
   tripStart: string;
   tripEnd: string;
   participantPageIds: string[];

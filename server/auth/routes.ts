@@ -8,6 +8,8 @@ import {
   RefreshSuccessResponseSchema,
   TicketSuccessResponseSchema,
 } from "@shared/api/auth.js";
+import { resolveTripConfig } from "../trips/resolveTripConfig.js";
+import { fetchTripTickets } from "../tickets.js";
 import { sendJson } from "../sendJson.js";
 import { createSession, signAccessToken, verifyRefreshToken } from "./jwt.js";
 import { requireAuth, type AuthedRequest } from "./middleware.js";
@@ -82,16 +84,12 @@ export async function handleMe(req: Request, res: Response) {
   sendJson(res, MeSuccessResponseSchema, { ok: true, user });
 }
 
-export async function handleTicket(req: Request, res: Response) {
-  const user = (req as AuthedRequest).user;
+export async function handleTicket(_req: Request, res: Response) {
   sendJson(res, TicketSuccessResponseSchema, {
     ok: true,
-    message: "票券功能開發中",
-    user,
+    groups: [],
   });
 }
-
-import { resolveTripConfig } from "../trips/resolveTripConfig.js";
 
 export async function handleTripTicket(req: Request, res: Response) {
   try {
@@ -108,11 +106,8 @@ export async function handleTripTicket(req: Request, res: Response) {
     }
 
     const user = (req as AuthedRequest).user;
-    sendJson(res, TicketSuccessResponseSchema, {
-      ok: true,
-      message: `票券功能開發中（${trip.displayName}）`,
-      user,
-    });
+    const payload = await fetchTripTickets(trip, user.id);
+    sendJson(res, TicketSuccessResponseSchema, payload);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     sendJson(res.status(500), ApiErrorSchema, { ok: false, error: message });

@@ -53,10 +53,25 @@ export const MeResponseSchema = z.discriminatedUnion("ok", [
   ApiErrorSchema,
 ]);
 
+export const TicketImageSchema = z.object({
+  url: z.string().min(1),
+  name: z.string().nullish(),
+});
+
+export const TicketItemSchema = z.object({
+  id: z.string(),
+  label: z.string().nullish(),
+  images: z.array(TicketImageSchema),
+});
+
+export const TicketDateGroupSchema = z.object({
+  date: z.string(),
+  tickets: z.array(TicketItemSchema),
+});
+
 export const TicketSuccessResponseSchema = z.object({
   ok: z.literal(true),
-  message: z.string(),
-  user: AuthUserSchema,
+  groups: z.array(TicketDateGroupSchema),
 });
 
 export const TicketResponseSchema = z.discriminatedUnion("ok", [
@@ -72,5 +87,8 @@ export type RefreshSuccessResponse = z.infer<typeof RefreshSuccessResponseSchema
 export type RefreshResponse = z.infer<typeof RefreshResponseSchema>;
 export type MeSuccessResponse = z.infer<typeof MeSuccessResponseSchema>;
 export type MeResponse = z.infer<typeof MeResponseSchema>;
+export type TicketImage = z.infer<typeof TicketImageSchema>;
+export type TicketItem = z.infer<typeof TicketItemSchema>;
+export type TicketDateGroup = z.infer<typeof TicketDateGroupSchema>;
 export type TicketSuccessResponse = z.infer<typeof TicketSuccessResponseSchema>;
 export type TicketResponse = z.infer<typeof TicketResponseSchema>;
