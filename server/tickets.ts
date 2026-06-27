@@ -27,6 +27,14 @@ function getTitlePlain(properties: Record<string, unknown>, name: string) {
   return prop.title?.map((part) => part.plain_text ?? "").join("").trim() || null;
 }
 
+function getRichTextPlain(properties: Record<string, unknown>, name: string) {
+  const prop = properties[name] as
+    | { type?: string; rich_text?: Array<{ plain_text?: string }> }
+    | undefined;
+  if (prop?.type !== "rich_text") return null;
+  return prop.rich_text?.map((part) => part.plain_text ?? "").join("").trim() || null;
+}
+
 function getSelectValue(properties: Record<string, unknown>, name: string) {
   const prop = properties[name] as { type?: string; select?: { name?: string } | null } | undefined;
   if (prop?.type !== "select") return null;
@@ -42,7 +50,12 @@ function getMultiSelectValues(properties: Record<string, unknown>, name: string)
 }
 
 function getLabelValue(properties: Record<string, unknown>, name: string) {
-  return getSelectValue(properties, name) ?? getMultiSelectValues(properties, name)[0] ?? null;
+  return (
+    getRichTextPlain(properties, name) ??
+    getSelectValue(properties, name) ??
+    getMultiSelectValues(properties, name)[0] ??
+    null
+  );
 }
 
 function getDateStart(properties: Record<string, unknown>, name: string) {

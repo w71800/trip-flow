@@ -12,19 +12,18 @@ import "./TicketPage.css";
 const ticketEmptyIcon = <TicketIcon className="emptyStateIcon" />;
 
 function TicketCard({
-  id,
   label,
   images,
 }: {
-  id: string;
   label?: string | null;
   images: Array<{ url: string; name?: string | null }>;
 }) {
+  const title = label?.trim() || "票券";
+
   return (
     <article className="ticketCard">
       <header className="ticketCardHeader">
-        <h3 className="ticketCardTitle">{id}</h3>
-        {label ? <span className="ticketLabel">{label}</span> : null}
+        <h3 className="ticketCardTitle">{title}</h3>
       </header>
       {images.length > 0 ? (
         <div className="ticketImages">
@@ -32,7 +31,7 @@ function TicketCard({
             <figure key={image.url} className="ticketImage">
               <img
                 src={image.url}
-                alt={image.name ?? id}
+                alt={image.name ?? title}
                 loading="lazy"
               />
             </figure>
