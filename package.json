@@ -7,7 +7,8 @@
     "dev": "concurrently -k \"vite\" \"tsx watch server/index.ts\"",
     "build": "vite build",
     "start": "tsx server/index.ts",
-    "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test server/itinerary/*.test.ts"
   },
   "keywords": [],
   "author": "",

@@ -1,5 +1,4 @@
 import type { Request, Response } from "express";
-import { z } from "zod";
 import { ApiErrorSchema } from "@shared/api/common.js";
 import {
   ItineraryItemContentSuccessResponseSchema,
@@ -15,191 +14,28 @@ import {
   getItineraryCache,
   setItineraryCache,
   touchItineraryFingerprintCheck,
-  type ItineraryCachePayload,
 } from "./itineraryCache.js";
+import {
+  buildRunConfigFromEnv,
+  buildRunConfigFromTrip,
+  LEGACY_CACHE_SLUG,
+  type ItineraryRunConfig,
+} from "./itinerary/config.js";
+import { buildOrder } from "./itinerary/flowGraph.js";
+import {
+  getDateFromPage,
+  getRelationIds,
+  getTitleFromPage,
+  pickDatePropertyName,
+  pickRelationPropertyName,
+  pickTitlePropertyName,
+} from "./itinerary/flowProperties.js";
+import type { FlowNode, FlowPropertyNames, ItineraryContext } from "./itinerary/types.js";
 import { getNotionClient } from "./notion.js";
 import { blocksToHtml } from "./notionBlocksToHtml.js";
 import { propertiesToHtml } from "./notionPropertiesToHtml.js";
 import { sendJson } from "./sendJson.js";
 import { resolveTripConfig } from "./trips/resolveTripConfig.js";
-import type { TripConfig } from "./trips/types.js";
-
-const EnvSchema = z.object({
-  NOTION_TOKEN: z.string().min(1),
-  NOTION_FLOW_DATABASE_ID: z.string().min(1),
-  NOTION_FLOW_NEXT_PROPERTY: z.string().optional(),
-  NOTION_FLOW_PREVIOUS_PROPERTY: z.string().optional(),
-  NOTION_FLOW_DETAILS_PROPERTY: z.string().optional(),
-  NOTION_FLOW_TITLE_PROPERTY: z.string().optional(),
-  NOTION_FLOW_DATE_PROPERTY: z.string().optional(),
-  TRIP_START_DATE: z.string().optional(),
-  TRIP_END_DATE: z.string().optional(),
-  NOTION_BLOCKS_MAX_RENDER: z.string().optional(),
-  NOTION_BLOCKS_MAX_FETCH: z.string().optional(),
-  NOTION_MAX_CARDS: z.string().optional(),
-  ITINERARY_CACHE_MAX_AGE: z.string().optional(),
-  ITINERARY_FINGERPRINT_TTL: z.string().optional(),
-});
-
-export type ItineraryRunConfig = {
-  flowDatabaseId: string;
-  flowTitleProperty?: string;
-  flowNextProperty?: string;
-  flowPreviousProperty?: string;
-  flowDetailsProperty?: string;
-  flowDateProperty?: string;
-  tripStart: string;
-  tripEnd: string;
-  tripSlug?: string;
-  tripDisplayName?: string;
-  blocksMaxRender: number;
-  blocksMaxFetch: number;
-  maxCards: number;
-  cacheMaxAge: number;
-  fingerprintTtlMs: number;
-};
-
-const LEGACY_CACHE_SLUG = "__legacy__";
-
-function getLegacyEnv() {
-  const parsed = EnvSchema.safeParse(process.env);
-  if (!parsed.success) {
-    const missingVars = parsed.error.issues
-      .filter((i) => (i as { code?: string }).code === "invalid_type")
-      .filter(
-        (i) =>
-          (i as { received?: string }).received === "undefined" ||
-          (i as { received?: string }).received === undefined,
-      )
-      .map((i) => i.path.join("."))
-      .filter(Boolean);
-
-    if (missingVars.length > 0) {
-      throw new Error(`缺少環境變數：${Array.from(new Set(missingVars)).join(", ")}`);
-    }
-
-    throw new Error(parsed.error.issues.map((i) => i.message).join("; "));
-  }
-  return parsed.data;
-}
-
-function buildRunConfigFromEnv(): ItineraryRunConfig {
-  const env = getLegacyEnv();
-  return {
-    flowDatabaseId: env.NOTION_FLOW_DATABASE_ID,
-    flowTitleProperty: env.NOTION_FLOW_TITLE_PROPERTY,
-    flowNextProperty: env.NOTION_FLOW_NEXT_PROPERTY,
-    flowPreviousProperty: env.NOTION_FLOW_PREVIOUS_PROPERTY,
-    flowDetailsProperty: env.NOTION_FLOW_DETAILS_PROPERTY,
-    flowDateProperty: env.NOTION_FLOW_DATE_PROPERTY,
-    tripStart: env.TRIP_START_DATE ?? "2026-07-16",
-    tripEnd: env.TRIP_END_DATE ?? "2026-07-23",
-    blocksMaxRender: Number(env.NOTION_BLOCKS_MAX_RENDER ?? "12"),
-    blocksMaxFetch: Number(env.NOTION_BLOCKS_MAX_FETCH ?? "60"),
-    maxCards: Number(env.NOTION_MAX_CARDS ?? "50"),
-    cacheMaxAge: Number(env.ITINERARY_CACHE_MAX_AGE ?? "86400"),
-    fingerprintTtlMs: Number(env.ITINERARY_FINGERPRINT_TTL ?? "3600") * 1000,
-  };
-}
-
-function buildRunConfigFromTrip(trip: TripConfig): ItineraryRunConfig {
-  const env = process.env;
-  return {
-    flowDatabaseId: trip.flowDatabaseId,
-    flowTitleProperty: env.NOTION_FLOW_TITLE_PROPERTY,
-    flowNextProperty: env.NOTION_FLOW_NEXT_PROPERTY,
-    flowPreviousProperty: env.NOTION_FLOW_PREVIOUS_PROPERTY,
-    flowDetailsProperty: env.NOTION_FLOW_DETAILS_PROPERTY,
-    flowDateProperty: env.NOTION_FLOW_DATE_PROPERTY,
-    tripStart: trip.tripStart,
-    tripEnd: trip.tripEnd,
-    tripSlug: trip.slug,
-    tripDisplayName: trip.displayName,
-    blocksMaxRender: Number(env.NOTION_BLOCKS_MAX_RENDER ?? "12"),
-    blocksMaxFetch: Number(env.NOTION_BLOCKS_MAX_FETCH ?? "60"),
-    maxCards: Number(env.NOTION_MAX_CARDS ?? "50"),
-    cacheMaxAge: Number(env.ITINERARY_CACHE_MAX_AGE ?? "86400"),
-    fingerprintTtlMs: Number(env.ITINERARY_FINGERPRINT_TTL ?? "3600") * 1000,
-  };
-}
-
-function getTitleFromPage(page: any, titlePropertyName: string): string {
-  const prop = page?.properties?.[titlePropertyName];
-  if (!prop) return "";
-  if (prop.type !== "title") return "";
-  const titleParts = (prop.title ?? []).map((t: any) => t.plain_text ?? "");
-  return titleParts.join("").trim();
-}
-
-function getRelationIds(prop: any): string[] {
-  if (!prop || prop.type !== "relation") return [];
-  return (prop.relation ?? []).map((r: any) => r.id).filter(Boolean);
-}
-
-function pickTitlePropertyName(schema: any, override?: string) {
-  if (override) return override;
-  for (const [name, prop] of Object.entries<any>(schema?.properties ?? {})) {
-    if (prop?.type === "title") return name;
-  }
-  throw new Error(
-    "找不到 title 欄位；請在 .env 設定 NOTION_FLOW_TITLE_PROPERTY（你的 database 可能是「名稱」）。",
-  );
-}
-
-function pickDatePropertyName(schema: any, override?: string) {
-  if (override) return override;
-
-  const dateCandidates: string[] = [];
-  for (const [name, prop] of Object.entries<any>(schema?.properties ?? {})) {
-    if (prop?.type === "date") dateCandidates.push(name);
-  }
-
-  const datePatterns = [/日期/i, /date/i, /時間/i, /time/i, /day/i];
-  for (const name of dateCandidates) {
-    if (datePatterns.some((re) => re.test(name))) return name;
-  }
-
-  return dateCandidates[0] ?? null;
-}
-
-function getDateFromPage(page: any, datePropertyName: string | null): string | null {
-  if (!datePropertyName) return null;
-  const prop = page?.properties?.[datePropertyName];
-  if (!prop || prop.type !== "date" || !prop.date?.start) return null;
-  return String(prop.date.start).slice(0, 10);
-}
-
-function pickRelationPropertyName(
-  schema: any,
-  override: string | undefined,
-  mode: "next" | "previous" | "details",
-) {
-  if (override) return override;
-
-  const relationCandidates: { name: string; schema: any }[] = [];
-  for (const [name, prop] of Object.entries<any>(schema?.properties ?? {})) {
-    if (prop?.type === "relation") relationCandidates.push({ name, schema: prop });
-  }
-
-  const names = relationCandidates.map((c) => c.name);
-  const includesAny = (value: string, patterns: RegExp[]) =>
-    patterns.some((re) => re.test(value));
-
-  if (mode === "next") {
-    const nextPatterns = [/next/i, /下一/i, /後一|後續|下一步/i];
-    for (const n of names) if (includesAny(n, nextPatterns)) return n;
-  }
-  if (mode === "previous") {
-    const prevPatterns = [/previous/i, /上一/i, /前一|前段|之前|上一步|prev/i];
-    for (const n of names) if (includesAny(n, prevPatterns)) return n;
-  }
-  if (mode === "details") {
-    const detailPatterns = [/行程/i, /details?/i, /連結|連接/i, /link/i, /page/i];
-    for (const n of names) if (includesAny(n, detailPatterns)) return n;
-  }
-
-  return null;
-}
 
 async function resolveDataSource(notion: any, dbId: string) {
   let databaseId = dbId;
@@ -285,50 +121,6 @@ async function getPageBlocks(notion: any, pageId: string, maxFetch: number): Pro
   }
 }
 
-function buildOrder(nodesById: Map<string, any>) {
-  const nodes = Array.from(nodesById.values());
-  const getPrev = (n: any) => (n.prevId ? [n.prevId] : []);
-  const getNext = (n: any) => (n.nextId ? n.nextId : null);
-
-  const visited = new Set<string>();
-  const orderedIds: string[] = [];
-
-  const candidates = nodes.filter((n) => {
-    const prevIds = getPrev(n);
-    if (prevIds.length === 0) return true;
-    return prevIds.every((pid) => !nodesById.has(pid));
-  });
-
-  for (const start of candidates) {
-    if (visited.has(start.id)) continue;
-
-    let current: any = start;
-    while (current && !visited.has(current.id)) {
-      visited.add(current.id);
-      orderedIds.push(current.id);
-      const nextId = getNext(current);
-      current = nextId ? nodesById.get(nextId) : null;
-    }
-  }
-
-  return orderedIds;
-}
-
-type ItineraryContext = {
-  config: ItineraryRunConfig;
-  notion: ReturnType<typeof getNotionClient>;
-  dataSourceId: string;
-  dataSource: any;
-  titlePropertyName: string;
-  nextPropertyName: string;
-  prevPropertyName: string;
-  detailsPropertyName: string | null;
-  datePropertyName: string | null;
-  pages: any[];
-  linkedNodes: Map<string, any>;
-  pageById: Map<string, any>;
-};
-
 function parseIfNoneMatch(header: string | undefined): string | null {
   if (!header) return null;
   const first = header.split(",")[0]?.trim();
@@ -342,7 +134,7 @@ function setItineraryResponseHeaders(res: Response, etag: string, maxAge: number
 
 async function collectContentTimestamps(
   notion: any,
-  linkedNodes: Map<string, any>,
+  linkedNodes: Map<string, { id: string; detailsId?: string | null }>,
   pageById: Map<string, any>,
 ): Promise<Array<{ id: string; last_edited_time: string }>> {
   const timestamps: Array<{ id: string; last_edited_time: string }> = [];
@@ -410,7 +202,7 @@ async function prepareItineraryContext(config: ItineraryRunConfig): Promise<Itin
   }
 
   const pages = await queryDataSourceAllPages(notion, dataSourceId);
-  const nodesById = new Map<string, any>();
+  const nodesById = new Map<string, FlowNode>();
   const pageById = new Map<string, any>();
 
   for (const page of pages) {
@@ -432,7 +224,7 @@ async function prepareItineraryContext(config: ItineraryRunConfig): Promise<Itin
     });
   }
 
-  const linkedNodes = new Map<string, any>();
+  const linkedNodes = new Map<string, FlowNode>();
   for (const [id, node] of nodesById) {
     if (node.nextId || node.prevId) linkedNodes.set(id, node);
   }
@@ -452,14 +244,6 @@ async function prepareItineraryContext(config: ItineraryRunConfig): Promise<Itin
     pageById,
   };
 }
-
-type FlowPropertyNames = {
-  titlePropertyName: string;
-  nextPropertyName: string;
-  prevPropertyName: string;
-  detailsPropertyName: string | null;
-  datePropertyName: string | null;
-};
 
 function getFlowSkipProps(
   names: FlowPropertyNames,
