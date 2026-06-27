@@ -5,6 +5,7 @@ import {
   getRelationIds,
   getTitleFromPage,
   pickDatePropertyName,
+  pickFlowPropertyNames,
   pickRelationPropertyName,
   pickTitlePropertyName,
 } from "./flowProperties.js";
@@ -118,6 +119,57 @@ describe("getRelationIds", () => {
   it("returns empty array for non-relation properties", () => {
     assert.deepEqual(getRelationIds(null), []);
     assert.deepEqual(getRelationIds({ type: "title" }), []);
+  });
+});
+
+describe("pickFlowPropertyNames", () => {
+  const schema = {
+    properties: {
+      名稱: { type: "title" },
+      下一個: { type: "relation" },
+      上一個: { type: "relation" },
+      行程詳情: { type: "relation" },
+      行程日期: { type: "date" },
+    },
+  };
+
+  it("resolves all flow property names from schema", () => {
+    assert.deepEqual(pickFlowPropertyNames(schema, {}), {
+      titlePropertyName: "名稱",
+      nextPropertyName: "下一個",
+      prevPropertyName: "上一個",
+      detailsPropertyName: "行程詳情",
+      datePropertyName: "行程日期",
+    });
+  });
+
+  it("respects env overrides", () => {
+    assert.deepEqual(
+      pickFlowPropertyNames(schema, {
+        flowTitleProperty: "自訂標題",
+        flowNextProperty: "自訂下一個",
+        flowPreviousProperty: "自訂上一個",
+      }),
+      {
+        titlePropertyName: "自訂標題",
+        nextPropertyName: "自訂下一個",
+        prevPropertyName: "自訂上一個",
+        detailsPropertyName: "行程詳情",
+        datePropertyName: "行程日期",
+      },
+    );
+  });
+
+  it("throws when next or previous relation fields are missing", () => {
+    const incompleteSchema = {
+      properties: {
+        名稱: { type: "title" },
+      },
+    };
+    assert.throws(
+      () => pickFlowPropertyNames(incompleteSchema, {}),
+      /找不到 next\/previous 關聯欄位/,
+    );
   });
 });
 

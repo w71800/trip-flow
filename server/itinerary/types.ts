@@ -1,5 +1,6 @@
 import type { getNotionClient } from "../notion.js";
 import type { ItineraryRunConfig } from "./config.js";
+import type { FlowPropertyNames } from "./flowProperties.js";
 
 export type FlowNode = {
   id: string;
@@ -9,13 +10,7 @@ export type FlowNode = {
   detailsId: string | null;
 };
 
-export type FlowPropertyNames = {
-  titlePropertyName: string;
-  nextPropertyName: string;
-  prevPropertyName: string;
-  detailsPropertyName: string | null;
-  datePropertyName: string | null;
-};
+export type { FlowPropertyNames };
 
 export type ItineraryContext = {
   config: ItineraryRunConfig;

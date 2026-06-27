@@ -1,5 +1,21 @@
 type NotionSchema = { properties?: Record<string, { type?: string }> };
 
+export type FlowPropertyConfig = {
+  flowTitleProperty?: string;
+  flowNextProperty?: string;
+  flowPreviousProperty?: string;
+  flowDetailsProperty?: string;
+  flowDateProperty?: string;
+};
+
+export type FlowPropertyNames = {
+  titlePropertyName: string;
+  nextPropertyName: string;
+  prevPropertyName: string;
+  detailsPropertyName: string | null;
+  datePropertyName: string | null;
+};
+
 export function getTitleFromPage(page: unknown, titlePropertyName: string): string {
   const properties = (page as { properties?: Record<string, unknown> })?.properties;
   const prop = properties?.[titlePropertyName] as
@@ -82,4 +98,41 @@ export function pickRelationPropertyName(
   }
 
   return null;
+}
+
+export function pickFlowPropertyNames(
+  dataSource: NotionSchema,
+  config: FlowPropertyConfig,
+): FlowPropertyNames {
+  const titlePropertyName = pickTitlePropertyName(dataSource, config.flowTitleProperty);
+  const nextPropertyName = pickRelationPropertyName(
+    dataSource,
+    config.flowNextProperty,
+    "next",
+  );
+  const prevPropertyName = pickRelationPropertyName(
+    dataSource,
+    config.flowPreviousProperty,
+    "previous",
+  );
+  const detailsPropertyName = pickRelationPropertyName(
+    dataSource,
+    config.flowDetailsProperty,
+    "details",
+  );
+  const datePropertyName = pickDatePropertyName(dataSource, config.flowDateProperty);
+
+  if (!nextPropertyName || !prevPropertyName) {
+    throw new Error(
+      "找不到 next/previous 關聯欄位；請設定 NOTION_FLOW_NEXT_PROPERTY 與 NOTION_FLOW_PREVIOUS_PROPERTY。",
+    );
+  }
+
+  return {
+    titlePropertyName,
+    nextPropertyName,
+    prevPropertyName,
+    detailsPropertyName,
+    datePropertyName,
+  };
 }
