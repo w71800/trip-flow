@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { TicketResponseSchema, type TicketDateGroup } from "@shared/api/auth";
 import { apiFetch } from "../auth/apiFetch";
 import { useAuth } from "../auth/AuthContext";
@@ -11,12 +11,71 @@ import "./TicketPage.css";
 
 const ticketEmptyIcon = <TicketIcon className="emptyStateIcon" />;
 
+type TicketImagePreviewState = {
+  url: string;
+  alt: string;
+};
+
+function TicketImagePreview({
+  preview,
+  onClose,
+}: {
+  preview: TicketImagePreviewState;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="ticketPreviewOverlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label={preview.alt}
+      onClick={onClose}
+    >
+      <div className="ticketPreviewPanel" onClick={(event) => event.stopPropagation()}>
+        <button
+          type="button"
+          className="ticketPreviewClose"
+          aria-label="關閉預覽"
+          onClick={onClose}
+        >
+          ✕
+        </button>
+        <img
+          className="ticketPreviewImage"
+          src={preview.url}
+          alt={preview.alt}
+        />
+        {preview.alt ? <p className="ticketPreviewCaption">{preview.alt}</p> : null}
+      </div>
+    </div>
+  );
+}
+
 function TicketCard({
   label,
   images,
+  onImageClick,
 }: {
   label?: string | null;
   images: Array<{ url: string; name?: string | null }>;
+  onImageClick: (preview: TicketImagePreviewState) => void;
 }) {
   const title = label?.trim() || "票券";
 
@@ -29,11 +88,23 @@ function TicketCard({
         <div className="ticketImages">
           {images.map((image) => (
             <figure key={image.url} className="ticketImage">
-              <img
-                src={image.url}
-                alt={image.name ?? title}
-                loading="lazy"
-              />
+              <button
+                type="button"
+                className="ticketImageButton"
+                aria-label={`放大預覽：${image.name ?? title}`}
+                onClick={() =>
+                  onImageClick({
+                    url: image.url,
+                    alt: image.name ?? title,
+                  })
+                }
+              >
+                <img
+                  src={image.url}
+                  alt={image.name ?? title}
+                  loading="lazy"
+                />
+              </button>
             </figure>
           ))}
         </div>
@@ -47,9 +118,11 @@ function TicketCard({
 function TicketDateToggle({
   group,
   defaultOpen,
+  onImageClick,
 }: {
   group: TicketDateGroup;
   defaultOpen: boolean;
+  onImageClick: (preview: TicketImagePreviewState) => void;
 }) {
   return (
     <details className="ticketToggle" open={defaultOpen}>
@@ -59,7 +132,11 @@ function TicketDateToggle({
       </summary>
       <div className="ticketToggleBody">
         {group.tickets.map((ticket) => (
-          <TicketCard key={`${group.date}-${ticket.id}`} {...ticket} />
+          <TicketCard
+            key={`${group.date}-${ticket.id}`}
+            {...ticket}
+            onImageClick={onImageClick}
+          />
         ))}
       </div>
     </details>
@@ -72,6 +149,15 @@ export function TicketPage() {
   const [groups, setGroups] = useState<TicketDateGroup[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [preview, setPreview] = useState<TicketImagePreviewState | null>(null);
+
+  const openPreview = useCallback((next: TicketImagePreviewState) => {
+    setPreview(next);
+  }, []);
+
+  const closePreview = useCallback(() => {
+    setPreview(null);
+  }, []);
 
   useEffect(() => {
     if (!slug || tripError) return;
@@ -146,10 +232,15 @@ export function TicketPage() {
               key={group.date}
               group={group}
               defaultOpen={index === 0}
+              onImageClick={openPreview}
             />
           ))}
         </div>
       )}
+
+      {preview ? (
+        <TicketImagePreview preview={preview} onClose={closePreview} />
+      ) : null}
     </main>
   );
 }

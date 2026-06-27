@@ -96,10 +96,92 @@
   background: var(--bg);
 }
 
+.ticketImageButton {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+
+.ticketImageButton:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
 .ticketImage img {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.ticketPreviewOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 0;
+  background: rgba(17, 24, 39, 0.88);
+}
+
+.ticketPreviewPanel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 56px 16px 24px;
+  box-sizing: border-box;
+}
+
+.ticketPreviewClose {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ticketPreviewClose:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.ticketPreviewClose:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.ticketPreviewImage {
+  display: block;
+  max-width: min(100%, 960px);
+  max-height: calc(100vh - 96px);
+  max-height: calc(100dvh - 96px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.ticketPreviewCaption {
+  margin: 14px 0 0;
+  max-width: min(100%, 960px);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 14px;
+  text-align: center;
+  line-height: 1.5;
 }
 
 .ticketNoImage {
