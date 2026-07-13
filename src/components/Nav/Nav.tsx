@@ -4,6 +4,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { useTripOptional } from "../../trip/TripContext";
 import {
   AccommodationIcon,
+  ChecklistIcon,
   CloseIcon,
   FlightIcon,
   MenuIcon,
@@ -28,6 +29,12 @@ function buildTripNavItems(tripSlug: string) {
       label: "住宿資訊",
       end: false,
       Icon: AccommodationIcon,
+    },
+    {
+      to: `/${tripSlug}/pretrip`,
+      label: "行前待辦清單",
+      end: false,
+      Icon: ChecklistIcon,
     },
     { to: `/${tripSlug}/ticket`, label: "票券", end: false, Icon: TicketIcon },
   ] as const;

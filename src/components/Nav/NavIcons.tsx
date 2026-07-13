@@ -66,6 +66,30 @@ export function AccommodationIcon({ className }: NavIconProps) {
   );
 }
 
+export function ChecklistIcon({ className }: NavIconProps) {
+  return (
+    <svg
+      className={className}
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 6h11" />
+      <path d="M9 12h11" />
+      <path d="M9 18h11" />
+      <path d="m3 6 1.5 1.5L7 5" />
+      <path d="m3 12 1.5 1.5L7 11" />
+      <path d="m3 18 1.5 1.5L7 17" />
+    </svg>
+  );
+}
+
 export function MenuIcon({ className }: NavIconProps) {
   return (
     <svg

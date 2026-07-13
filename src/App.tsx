@@ -7,6 +7,7 @@ import { AccommodationPage } from "./pages/AccommodationPage";
 import { FlightPage } from "./pages/FlightPage";
 import { ItineraryPage } from "./pages/ItineraryPage";
 import { LoginPage } from "./pages/LoginPage";
+import { PretripPage } from "./pages/PretripPage";
 import { TicketPage } from "./pages/TicketPage";
 import { TripsOverviewPage } from "./pages/TripsOverviewPage";
 
@@ -23,6 +24,7 @@ export default function App() {
             <Route index element={<ItineraryPage />} />
             <Route path="flight" element={<FlightPage />} />
             <Route path="accommodation" element={<AccommodationPage />} />
+            <Route path="pretrip" element={<PretripPage />} />
             <Route
               path="ticket"
               element={

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ApiErrorSchema } from "./common.js";
 
-export const PageKeySchema = z.enum(["flight", "accommodation"]);
+export const PageKeySchema = z.enum(["flight", "accommodation", "pretrip"]);
 
 export const PageMetaSchema = z.object({
   fetchedAt: z.string(),

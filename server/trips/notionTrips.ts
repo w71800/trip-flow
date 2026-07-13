@@ -10,6 +10,7 @@ const EnvSchema = z.object({
   NOTION_FLOW_DATABASE_ID: z.string().optional(),
   NOTION_FLIGHT_PAGE_ID: z.string().optional(),
   NOTION_ACCOMMODATION_PAGE_ID: z.string().optional(),
+  NOTION_PRETRIP_PAGE_ID: z.string().optional(),
   NOTION_TICKET_PAGE_ID: z.string().optional(),
   TRIP_START_DATE: z.string().optional(),
   TRIP_END_DATE: z.string().optional(),
@@ -22,6 +23,7 @@ const TRIP_FIELDS = {
   flowDatabaseId: "flow_database_id",
   flightPageId: "flight_page_id",
   accommodationPageId: "accommodation_page_id",
+  pretripPageId: "pretrip_page_id",
   ticketPageId: "ticket_page_id",
   period: "period",
 } as const;
@@ -127,6 +129,7 @@ function applyEnvFallback(
     flightPageId: partial.flightPageId || env.NOTION_FLIGHT_PAGE_ID?.trim() || null,
     accommodationPageId:
       partial.accommodationPageId || env.NOTION_ACCOMMODATION_PAGE_ID?.trim() || null,
+    pretripPageId: partial.pretripPageId || env.NOTION_PRETRIP_PAGE_ID?.trim() || null,
     ticketPageId: partial.ticketPageId || env.NOTION_TICKET_PAGE_ID?.trim() || null,
     tripStart: partial.tripStart || env.TRIP_START_DATE || "2026-07-16",
     tripEnd: partial.tripEnd || env.TRIP_END_DATE || "2026-07-23",
@@ -151,6 +154,7 @@ function parseTripPage(page: any, titlePropertyName: string): TripConfig {
     flowDatabaseId: flowDatabaseId ? normalizeNotionId(flowDatabaseId) : "",
     flightPageId: getRichTextPlain(properties, TRIP_FIELDS.flightPageId),
     accommodationPageId: getRichTextPlain(properties, TRIP_FIELDS.accommodationPageId),
+    pretripPageId: getRichTextPlain(properties, TRIP_FIELDS.pretripPageId),
     ticketPageId: getRichTextPlain(properties, TRIP_FIELDS.ticketPageId),
     tripStart: period?.start ?? "",
     tripEnd: period?.end ?? "",

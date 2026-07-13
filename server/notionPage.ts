@@ -18,6 +18,7 @@ const EnvSchema = z.object({
   NOTION_TOKEN: z.string().min(1),
   NOTION_FLIGHT_PAGE_ID: z.string().optional(),
   NOTION_ACCOMMODATION_PAGE_ID: z.string().optional(),
+  NOTION_PRETRIP_PAGE_ID: z.string().optional(),
   NOTION_PAGE_BLOCKS_MAX: z.string().optional(),
   NOTION_PAGE_CACHE_MAX_AGE: z.string().optional(),
 });
@@ -25,6 +26,7 @@ const EnvSchema = z.object({
 const DEFAULT_PAGE_IDS: Record<PageKey, string> = {
   flight: "384ffcbed6738011a42ecf60573ff254",
   accommodation: "",
+  pretrip: "",
 };
 
 type PageCacheEntry = {
@@ -55,6 +57,11 @@ function resolvePageIdFromEnv(key: PageKey, env: ReturnType<typeof getEnv>): str
   if (key === "flight") {
     const id = env.NOTION_FLIGHT_PAGE_ID ?? DEFAULT_PAGE_IDS.flight;
     if (!id) throw new Error("缺少 NOTION_FLIGHT_PAGE_ID");
+    return normalizePageId(id);
+  }
+  if (key === "pretrip") {
+    const id = env.NOTION_PRETRIP_PAGE_ID ?? DEFAULT_PAGE_IDS.pretrip;
+    if (!id) throw new Error("尚未設定 NOTION_PRETRIP_PAGE_ID");
     return normalizePageId(id);
   }
   const id = env.NOTION_ACCOMMODATION_PAGE_ID ?? DEFAULT_PAGE_IDS.accommodation;
